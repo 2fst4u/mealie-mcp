@@ -1,0 +1,62 @@
+// Runtime configuration, sourced entirely from environment variables so the
+// server works cleanly as an `npx` stdio process launched by an MCP client.
+
+export interface Config {
+  /** Base URL of the Mealie instance, e.g. https://mealie.example.com (no trailing slash). */
+  baseUrl: string;
+  /** Long-lived Mealie API token (Authorization: Bearer <token>). Optional but most endpoints need it. */
+  token?: string;
+  /** Where to load the OpenAPI spec from. Defaults to `${baseUrl}/openapi.json`. */
+  openapiUrl?: string;
+  /** Skip the live fetch and always use the snapshot bundled with the package. */
+  useBundledSpec: boolean;
+  /** Only expose read (GET) endpoints. Useful for safe, read-only deployments. */
+  readOnly: boolean;
+  /** Whitelist of tool names and/or category slugs to include. Empty = include all. */
+  include: string[];
+  /** Blacklist of tool names and/or category slugs to exclude. */
+  exclude: string[];
+  /** Per-request timeout in milliseconds. */
+  timeoutMs: number;
+  /** Optional default Accept-Language header forwarded to Mealie. */
+  acceptLanguage?: string;
+}
+
+function bool(value: string | undefined, fallback = false): boolean {
+  if (value === undefined) return fallback;
+  return /^(1|true|yes|on)$/i.test(value.trim());
+}
+
+function list(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const rawBase = env.MEALIE_BASE_URL?.trim();
+  if (!rawBase) {
+    throw new Error(
+      "MEALIE_BASE_URL is required (e.g. https://mealie.example.com). " +
+        "Set it in your MCP client config under the server's `env`.",
+    );
+  }
+  const baseUrl = rawBase.replace(/\/+$/, "");
+
+  const timeoutRaw = env.MEALIE_TIMEOUT?.trim();
+  const timeoutMs = timeoutRaw && /^\d+$/.test(timeoutRaw) ? Number(timeoutRaw) : 60_000;
+
+  return {
+    baseUrl,
+    token: env.MEALIE_API_TOKEN?.trim() || env.MEALIE_TOKEN?.trim() || undefined,
+    openapiUrl: env.MEALIE_OPENAPI_URL?.trim() || undefined,
+    useBundledSpec: bool(env.MEALIE_USE_BUNDLED_SPEC),
+    readOnly: bool(env.MEALIE_READ_ONLY),
+    include: list(env.MEALIE_TOOLS),
+    exclude: list(env.MEALIE_EXCLUDE_TOOLS),
+    timeoutMs,
+    acceptLanguage: env.MEALIE_ACCEPT_LANGUAGE?.trim() || undefined,
+  };
+}

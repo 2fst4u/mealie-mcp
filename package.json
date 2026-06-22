@@ -1,0 +1,57 @@
+{
+  "name": "mealie-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for Mealie — exposes every Mealie REST API endpoint as an MCP tool.",
+  "type": "module",
+  "license": "MIT",
+  "author": "2fst4u <2fst4u@users.noreply.github.com>",
+  "homepage": "https://github.com/2fst4u/mealie-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2fst4u/mealie-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/2fst4u/mealie-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mealie",
+    "recipes",
+    "meal-plan",
+    "shopping-list",
+    "llm",
+    "ai"
+  ],
+  "bin": {
+    "mealie-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "openapi.snapshot.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "dev": "node --import tsx src/index.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "refresh-spec": "node scripts/refresh-spec.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
