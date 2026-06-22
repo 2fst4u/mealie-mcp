@@ -141,6 +141,7 @@ export async function executeTool(config: Config, tool: MealieTool, args: Record
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   let res: Response;
+  let bodyResult: { blocks: ContentBlock[]; raw: string };
   try {
     res = await fetch(url, {
       method: tool.method.toUpperCase(),
@@ -148,6 +149,8 @@ export async function executeTool(config: Config, tool: MealieTool, args: Record
       body: payload,
       signal: controller.signal,
     });
+    // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
+    bodyResult = await readBody(res);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     return { content: [text(`Request to ${tool.method.toUpperCase()} ${url} failed: ${reason}`)], isError: true };
@@ -155,7 +158,7 @@ export async function executeTool(config: Config, tool: MealieTool, args: Record
     clearTimeout(timer);
   }
 
-  const { blocks } = await readBody(res);
+  const { blocks } = bodyResult;
 
   if (!res.ok) {
     const detail = blocks.map((b) => (b.type === "text" ? b.text : "[binary]")).join("\n");
