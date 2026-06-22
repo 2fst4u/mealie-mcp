@@ -48,14 +48,38 @@ test("generates one valid tool per operation", async () => {
   const names = new Set<string>();
   for (const t of tools) {
     assert.match(t.name, /^[a-zA-Z0-9_-]{1,64}$/, `invalid tool name: ${t.name}`);
-    // Stay comfortably under the 64-char limit so clients that prefix the
-    // server name (e.g. remote connectors) don't overflow it.
-    assert.ok(t.name.length <= 60, `tool name too long (${t.name.length}): ${t.name}`);
+    // Default cap keeps names short so clients that prefix the server name
+    // (e.g. `mcp__<server>__<tool>`) don't overflow the 64-char API limit.
+    assert.ok(t.name.length <= 50, `tool name too long (${t.name.length}): ${t.name}`);
     assert.ok(!names.has(t.name), `duplicate tool name: ${t.name}`);
     names.add(t.name);
     assert.equal((t.inputSchema as { type?: string }).type, "object", `${t.name} schema not object`);
     assert.ok(t.description.length > 0, `${t.name} has empty description`);
   }
+});
+
+test("respects a custom tool-name cap and stays unique", () => {
+  // A synthetic spec where many operations share a base name forces truncation
+  // collisions, which must still resolve to unique, in-budget names.
+  const doc = {
+    openapi: "3.1.0",
+    info: { title: "t", version: "1" },
+    paths: Object.fromEntries(
+      Array.from({ length: 30 }, (_, i) => [
+        `/api/very/long/resource/path/segment/number/${i}`,
+        { get: { tags: ["Very Long Category Name Here"], responses: {} } },
+      ]),
+    ),
+  } as unknown as OpenApiDocument;
+
+  const tools = generateTools(doc, 20);
+  const names = new Set<string>();
+  for (const t of tools) {
+    assert.ok(t.name.length <= 20, `name over cap: ${t.name} (${t.name.length})`);
+    assert.ok(!names.has(t.name), `duplicate after truncation: ${t.name}`);
+    names.add(t.name);
+  }
+  assert.equal(names.size, tools.length);
 });
 
 test("every tool input schema is self-contained ($defs closure)", async () => {

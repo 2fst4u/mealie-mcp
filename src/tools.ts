@@ -54,9 +54,9 @@ function dedupeTokens(name: string): string {
     .join("_");
 }
 
-// Keep names well under the MCP/Anthropic 64-char tool-name limit, leaving
-// headroom for clients (e.g. remote connectors) that prefix the server name.
-const MAX_NAME = 60;
+// Default cap for generated tool names. Kept well under the 64-char API limit
+// because clients commonly prefix names (e.g. `mcp__<server>__<tool>`).
+export const DEFAULT_NAME_MAX = 50;
 
 function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
   const category = slug(op.tags?.[0] ?? "misc");
@@ -65,15 +65,19 @@ function nameParts(op: OpenApiOperation, path: string, method: string): { catego
 }
 
 /**
- * Build the final tool name. Bare operation names (e.g. `suggest_recipes`) are
- * used as-is for brevity; names reused across routers (e.g. `get_all`,
- * `create_one`) are prefixed with their category to stay unique. Capped to
- * MAX_NAME so it stays comfortably under client tool-name limits.
+ * Build the (untruncated) tool name. Bare operation names (e.g.
+ * `suggest_recipes`) are used as-is for brevity; names reused across routers
+ * (e.g. `get_all`, `create_one`) are prefixed with their category to stay unique.
  */
 function buildName(category: string, base: string, prefixed: boolean): string {
-  let name = prefixed ? dedupeTokens(`${category}_${base}`.replace(/_+/g, "_")) : base;
-  if (name.length > MAX_NAME) name = name.slice(0, MAX_NAME).replace(/_+$/, "");
+  const name = prefixed ? dedupeTokens(`${category}_${base}`.replace(/_+/g, "_")) : base;
   return name || "tool";
+}
+
+/** Truncate a name to `max` chars without leaving a dangling underscore. */
+function clampName(name: string, max: number): string {
+  if (name.length <= max) return name;
+  return name.slice(0, max).replace(/_+$/, "") || name.slice(0, max);
 }
 
 function buildDescription(op: OpenApiOperation, path: string, method: string): string {
@@ -220,7 +224,7 @@ interface RawEntry {
 }
 
 /** Generate one MealieTool per operation in the OpenAPI document. */
-export function generateTools(doc: OpenApiDocument): MealieTool[] {
+export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NAME_MAX): MealieTool[] {
   const components = doc.components?.schemas ?? {};
 
   // First pass: collect operations and count how often each base name occurs,
@@ -244,10 +248,11 @@ export function generateTools(doc: OpenApiDocument): MealieTool[] {
   const tools: MealieTool[] = [];
   const usedNames = new Set<string>();
   for (const entry of entries) {
-    const rawName = buildName(entry.category, entry.base, baseCounts[entry.base] > 1);
+    const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
     let name = rawName;
     for (let i = 2; usedNames.has(name); i++) {
-      name = `${rawName.slice(0, MAX_NAME - 3)}_${i}`;
+      const suffix = `_${i}`;
+      name = `${clampName(rawName, nameMax - suffix.length)}${suffix}`;
     }
     usedNames.add(name);
 

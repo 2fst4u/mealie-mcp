@@ -32,6 +32,17 @@ test("parses boolean and list options", () => {
   assert.deepEqual(cfg.exclude, ["admin"]);
 });
 
+test("parses and clamps the tool-name cap", () => {
+  const def = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
+  assert.equal(def.toolNameMax, 50);
+  const low = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_TOOL_NAME_MAX: "5" } as NodeJS.ProcessEnv);
+  assert.equal(low.toolNameMax, 16); // clamped up
+  const high = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_TOOL_NAME_MAX: "200" } as NodeJS.ProcessEnv);
+  assert.equal(high.toolNameMax, 64); // clamped down
+  const ok = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_TOOL_NAME_MAX: "30" } as NodeJS.ProcessEnv);
+  assert.equal(ok.toolNameMax, 30);
+});
+
 test("defaults timeout and rejects non-numeric", () => {
   const a = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
   assert.equal(a.timeoutMs, 60_000);

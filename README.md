@@ -92,6 +92,7 @@ All configuration is via environment variables.
 | `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category prefixes to hide (e.g. `admin,groups_seeders`). |
 | `MEALIE_USE_BUNDLED_SPEC` | – | `false` | Skip the live OpenAPI fetch and use the snapshot bundled with the package. |
 | `MEALIE_OPENAPI_URL` | – | `${MEALIE_BASE_URL}/openapi.json` | Override where the OpenAPI schema is fetched from. |
+| `MEALIE_TOOL_NAME_MAX` | – | `50` | Max length of generated tool names (clamped to 16–64). Lower it if your MCP client prefixes tool names (e.g. `mcp__<server>__<tool>`) and the combined name exceeds the 64-char API limit. |
 | `MEALIE_TIMEOUT` | – | `60000` | Per-request timeout in milliseconds. |
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
 
@@ -143,6 +144,17 @@ Endpoints that upload files (recipe images, ZIP imports, backups, assets, …)
 take their file fields as **absolute paths to local files**, which the server
 reads and sends as multipart form data. The tool description tells the model
 which fields are file paths.
+
+### Troubleshooting: "name: String should have at most 64 characters"
+
+Some MCP clients/hubs (e.g. MCPHub, remote connectors) prefix every tool name
+with the server name — `mcp__<server>__<tool>` — and the **combined** string
+must stay within the API's 64-character limit. If you hit this error:
+
+1. Keep the server's name/alias short (`mealie` is ideal).
+2. Lower the tool-name cap, e.g. `MEALIE_TOOL_NAME_MAX=30`, until it fits.
+3. The error is global — Claude rejects the *whole* tool list if **any** tool
+   (from **any** server) is too long, so the culprit may be a different server.
 
 ### Categories
 

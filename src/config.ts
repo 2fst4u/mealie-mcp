@@ -20,7 +20,16 @@ export interface Config {
   timeoutMs: number;
   /** Optional default Accept-Language header forwarded to Mealie. */
   acceptLanguage?: string;
+  /**
+   * Maximum length for generated tool names. Kept low by default because many
+   * MCP clients prefix tool names (e.g. `mcp__<server>__<tool>`) and the
+   * combined string must stay within the 64-char API limit. Lower this further
+   * if your client adds a long prefix.
+   */
+  toolNameMax: number;
 }
+
+const DEFAULT_TOOL_NAME_MAX = 50;
 
 function bool(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
@@ -48,6 +57,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const timeoutRaw = env.MEALIE_TIMEOUT?.trim();
   const timeoutMs = timeoutRaw && /^\d+$/.test(timeoutRaw) ? Number(timeoutRaw) : 60_000;
 
+  const nameMaxRaw = env.MEALIE_TOOL_NAME_MAX?.trim();
+  const toolNameMax =
+    nameMaxRaw && /^\d+$/.test(nameMaxRaw)
+      ? Math.min(64, Math.max(16, Number(nameMaxRaw)))
+      : DEFAULT_TOOL_NAME_MAX;
+
   return {
     baseUrl,
     token: env.MEALIE_API_TOKEN?.trim() || env.MEALIE_TOKEN?.trim() || undefined,
@@ -58,5 +73,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     exclude: list(env.MEALIE_EXCLUDE_TOOLS),
     timeoutMs,
     acceptLanguage: env.MEALIE_ACCEPT_LANGUAGE?.trim() || undefined,
+    toolNameMax,
   };
 }

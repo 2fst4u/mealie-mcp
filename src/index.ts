@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const version = readVersion();
 
   const { doc, source } = await loadOpenApi(config);
-  const allTools = generateTools(doc);
+  const allTools = generateTools(doc, config.toolNameMax);
   const tools = filterTools(allTools, config);
 
   if (tools.length === 0) {
