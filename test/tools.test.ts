@@ -48,6 +48,9 @@ test("generates one valid tool per operation", async () => {
   const names = new Set<string>();
   for (const t of tools) {
     assert.match(t.name, /^[a-zA-Z0-9_-]{1,64}$/, `invalid tool name: ${t.name}`);
+    // Stay comfortably under the 64-char limit so clients that prefix the
+    // server name (e.g. remote connectors) don't overflow it.
+    assert.ok(t.name.length <= 60, `tool name too long (${t.name.length}): ${t.name}`);
     assert.ok(!names.has(t.name), `duplicate tool name: ${t.name}`);
     names.add(t.name);
     assert.equal((t.inputSchema as { type?: string }).type, "object", `${t.name} schema not object`);

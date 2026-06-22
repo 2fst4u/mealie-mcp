@@ -9,13 +9,12 @@ import { executeTool } from "./http-client.js";
 import type { MealieTool } from "./tools.js";
 
 export const SERVER_NAME = "mealie-mcp";
-export const SERVER_VERSION = "0.1.0";
 
-export function createServer(config: Config, tools: MealieTool[]): Server {
+export function createServer(config: Config, tools: MealieTool[], version: string): Server {
   const byName = new Map(tools.map((t) => [t.name, t]));
 
   const server = new Server(
-    { name: SERVER_NAME, version: SERVER_VERSION },
+    { name: SERVER_NAME, version },
     { capabilities: { tools: {} } },
   );
 

@@ -117,8 +117,12 @@ MEALIE_TOOLS="recipe,explore"
 
 ## How tools are named
 
-Each tool is named `<category>_<operation>`, derived from the Mealie OpenAPI
-tag and operation. For example:
+Each tool name is derived from the Mealie OpenAPI tag (category) and operation.
+Uniquely-named operations use their bare operation name (e.g. `suggest_recipes`);
+operations whose name is reused across resources (the CRUD verbs `get_all`,
+`get_one`, `create_one`, `update_one`, `delete_one`, …) are prefixed with their
+category to stay unique and to keep them grouped. All names are kept well under
+the 64-character tool-name limit. For example:
 
 | Tool | Method & path |
 | --- | --- |

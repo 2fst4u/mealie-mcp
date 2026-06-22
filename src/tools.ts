@@ -54,12 +54,26 @@ function dedupeTokens(name: string): string {
     .join("_");
 }
 
-function buildName(op: OpenApiOperation, path: string, method: string): { name: string; category: string } {
+// Keep names well under the MCP/Anthropic 64-char tool-name limit, leaving
+// headroom for clients (e.g. remote connectors) that prefix the server name.
+const MAX_NAME = 60;
+
+function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
   const category = slug(op.tags?.[0] ?? "misc");
-  const fn = operationName(op.operationId, path, method);
-  let name = dedupeTokens(`${category}_${fn}`.replace(/_+/g, "_"));
-  if (name.length > 64) name = name.slice(0, 64).replace(/_+$/, "");
-  return { name, category };
+  const base = dedupeTokens(operationName(op.operationId, path, method).replace(/_+/g, "_"));
+  return { category, base };
+}
+
+/**
+ * Build the final tool name. Bare operation names (e.g. `suggest_recipes`) are
+ * used as-is for brevity; names reused across routers (e.g. `get_all`,
+ * `create_one`) are prefixed with their category to stay unique. Capped to
+ * MAX_NAME so it stays comfortably under client tool-name limits.
+ */
+function buildName(category: string, base: string, prefixed: boolean): string {
+  let name = prefixed ? dedupeTokens(`${category}_${base}`.replace(/_+/g, "_")) : base;
+  if (name.length > MAX_NAME) name = name.slice(0, MAX_NAME).replace(/_+$/, "");
+  return name || "tool";
 }
 
 function buildDescription(op: OpenApiOperation, path: string, method: string): string {
@@ -195,43 +209,69 @@ function buildInputSchema(
   return { inputSchema, pathParams, queryParams };
 }
 
+interface RawEntry {
+  path: string;
+  method: HttpMethod;
+  op: OpenApiOperation;
+  params: OpenApiParameter[];
+  body: ReturnType<typeof pickBody>;
+  category: string;
+  base: string;
+}
+
 /** Generate one MealieTool per operation in the OpenAPI document. */
 export function generateTools(doc: OpenApiDocument): MealieTool[] {
   const components = doc.components?.schemas ?? {};
-  const tools: MealieTool[] = [];
-  const usedNames = new Set<string>();
 
+  // First pass: collect operations and count how often each base name occurs,
+  // so we only prepend the category to names that would otherwise collide.
+  const entries: RawEntry[] = [];
+  const baseCounts: Record<string, number> = {};
   for (const [path, item] of Object.entries(doc.paths)) {
     const sharedParams = item.parameters ?? [];
     for (const method of HTTP_METHODS) {
       const op = item[method];
       if (!op) continue;
-
       const params = [...sharedParams, ...(op.parameters ?? [])];
       const body = pickBody(op, components);
-      const { name: rawName, category } = buildName(op, path, method);
-
-      let name = rawName;
-      for (let i = 2; usedNames.has(name); i++) {
-        name = `${rawName.slice(0, 61)}_${i}`;
-      }
-      usedNames.add(name);
-
-      const { inputSchema, pathParams, queryParams } = buildInputSchema(op, params, body, components);
-
-      tools.push({
-        name,
-        description: buildDescription(op, path, method),
-        inputSchema,
-        category,
-        method,
-        path,
-        pathParams,
-        queryParams,
-        body: body ? { kind: body.kind, required: body.required, fileFields: body.fileFields } : undefined,
-        deprecated: Boolean(op.deprecated),
-      });
+      const { category, base } = nameParts(op, path, method);
+      baseCounts[base] = (baseCounts[base] ?? 0) + 1;
+      entries.push({ path, method, op, params, body, category, base });
     }
+  }
+
+  // Second pass: build tools with finalized, unique names.
+  const tools: MealieTool[] = [];
+  const usedNames = new Set<string>();
+  for (const entry of entries) {
+    const rawName = buildName(entry.category, entry.base, baseCounts[entry.base] > 1);
+    let name = rawName;
+    for (let i = 2; usedNames.has(name); i++) {
+      name = `${rawName.slice(0, MAX_NAME - 3)}_${i}`;
+    }
+    usedNames.add(name);
+
+    const { inputSchema, pathParams, queryParams } = buildInputSchema(
+      entry.op,
+      entry.params,
+      entry.body,
+      components,
+    );
+
+    tools.push({
+      name,
+      description: buildDescription(entry.op, entry.path, entry.method),
+      inputSchema,
+      category: entry.category,
+      method: entry.method,
+      path: entry.path,
+      pathParams,
+      queryParams,
+      body: entry.body
+        ? { kind: entry.body.kind, required: entry.body.required, fileFields: entry.body.fileFields }
+        : undefined,
+      deprecated: Boolean(entry.op.deprecated),
+    });
   }
 
   return tools;

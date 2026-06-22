@@ -1,16 +1,30 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
 import { loadOpenApi } from "./openapi-loader.js";
 import { filterTools, generateTools } from "./tools.js";
-import { createServer, SERVER_NAME, SERVER_VERSION } from "./server.js";
+import { createServer, SERVER_NAME } from "./server.js";
 
 function log(message: string): void {
   process.stderr.write(`[mealie-mcp] ${message}\n`);
 }
 
+/** Read this package's version from package.json (single source of truth). */
+function readVersion(): string {
+  try {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+    return JSON.parse(readFileSync(pkgPath, "utf8")).version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
+  const version = readVersion();
 
   const { doc, source } = await loadOpenApi(config);
   const allTools = generateTools(doc);
@@ -21,14 +35,14 @@ async function main(): Promise<void> {
   }
 
   const categories = new Set(tools.map((t) => t.category));
-  log(`${SERVER_NAME} v${SERVER_VERSION}`);
+  log(`${SERVER_NAME} v${version}`);
   log(`Mealie: ${config.baseUrl} | spec: ${source} (${doc.info?.version ?? "unknown"} version)`);
   log(`Exposing ${tools.length}/${allTools.length} tools across ${categories.size} categories.`);
   if (!config.token) {
     log("No MEALIE_API_TOKEN set — only unauthenticated endpoints will succeed.");
   }
 
-  const server = createServer(config, tools);
+  const server = createServer(config, tools, version);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log("Server ready on stdio.");
