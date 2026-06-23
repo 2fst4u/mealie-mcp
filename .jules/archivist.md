@@ -1,0 +1,4 @@
+## 2026-06-23 - CI Workflow and Documentation Drift
+
+**Learning:** Documentation for CI release processes often drifts from the actual workflow implementation. In this case, `README.md` stated that developers needed to manually bump the version in `package.json` in their PRs to trigger a release. However, the actual implementation in `.github/workflows/release.yml` used `npm version patch --no-git-tag-version` to automatically bump the version, commit, tag, and publish on every merge to `main`. This caused ambiguity about whether manual action was required.
+**Action:** When updating instructions on how to cut a release, always verify the claims by directly inspecting the `.github/workflows/` files (or other CI configurations). Do not assume the documentation is accurate, even if it sounds authoritative. Ensure `README.md` and `CONTRIBUTING.md` accurately reflect the automated steps taken by the pipeline.
