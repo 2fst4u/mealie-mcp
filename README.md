@@ -270,10 +270,9 @@ This repo ships two GitHub Actions workflows:
 
 - **CI** (`.github/workflows/ci.yml`) — runs type-check, build and tests on every
   pull request (and on non-`main` branch pushes) across Node 18/20/22.
-- **Release** (`.github/workflows/release.yml`) — on every push/merge to `main`,
-  builds and tests, then creates a GitHub Release `v<version>` (with auto-generated
-  notes) and publishes to npm **if that version hasn't been released yet**. To cut
-  a release, bump `version` in `package.json` in your PR; merging it ships the release.
+- **Release** (`.github/workflows/release.yml`) — on every push/merge to `main` that touches source files,
+  builds and tests, auto-bumps the patch version, creates a GitHub Release `v<version>` (with auto-generated
+  notes), and publishes to npm.
 
 ### Publishing to npm (Trusted Publishing / OIDC)
 
@@ -297,7 +296,7 @@ there is a **one-time bootstrap** for the first ever publish:
    - **Repository:** `mealie-mcp`
    - **Workflow filename:** `release.yml`
    - **Environment:** *(leave blank)*
-3. From then on, **every merge to `main` with a bumped version publishes
+3. From then on, **every merge to `main` that touches source files auto-bumps the patch version and publishes
    automatically** over OIDC — no tokens, no manual steps.
 
 > Requirements (handled by the workflow): `id-token: write` permission, Node
