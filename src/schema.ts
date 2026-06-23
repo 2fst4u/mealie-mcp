@@ -30,31 +30,37 @@ function collectRefs(
   seen: Set<string>,
 ): void {
   if (Array.isArray(node)) {
-    for (const item of node) collectRefs(item, components, seen);
+    // ⚡ Bolt: Using a standard for-loop avoids allocating an iterator on every recursive call.
+    for (let i = 0; i < node.length; i++) collectRefs(node[i], components, seen);
     return;
   }
   if (!node || typeof node !== "object") return;
 
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-    if (key === "$ref" && typeof value === "string") {
-      const match = COMPONENT_REF.exec(value);
-      if (match) {
-        const name = match[1];
-        if (!seen.has(name)) {
-          seen.add(name);
-          if (components[name]) collectRefs(components[name], components, seen);
-        }
+  const obj = node as Record<string, unknown>;
+  if (typeof obj.$ref === "string") {
+    const match = COMPONENT_REF.exec(obj.$ref);
+    if (match) {
+      const name = match[1];
+      if (!seen.has(name)) {
+        seen.add(name);
+        if (components[name]) collectRefs(components[name], components, seen);
       }
-      continue;
     }
-    collectRefs(value, components, seen);
+  }
+
+  // ⚡ Bolt: Using for...in avoids Object.entries() which allocates an array
+  // of all key-value pairs on every recursive call, severely hurting performance.
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (key !== "$ref") collectRefs(obj[key], components, seen);
+    }
   }
 }
 
 /** Rewrite `#/components/schemas/X` refs to local `#/$defs/X` refs (in place). */
 function rewriteRefs(node: unknown): void {
   if (Array.isArray(node)) {
-    for (const item of node) rewriteRefs(item);
+    for (let i = 0; i < node.length; i++) rewriteRefs(node[i]);
     return;
   }
   if (!node || typeof node !== "object") return;
@@ -64,7 +70,14 @@ function rewriteRefs(node: unknown): void {
     const match = COMPONENT_REF.exec(obj.$ref);
     if (match) obj.$ref = `#/$defs/${match[1]}`;
   }
-  for (const value of Object.values(obj)) rewriteRefs(value);
+
+  // ⚡ Bolt: Using for...in avoids Object.values() which allocates an array
+  // of all values on every recursive call.
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (key !== "$ref") rewriteRefs(obj[key]);
+    }
+  }
 }
 
 /**
