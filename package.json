@@ -1,6 +1,6 @@
 {
   "name": "mealie-mcp",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Model Context Protocol (MCP) server for Mealie — exposes every Mealie REST API endpoint as an MCP tool.",
   "type": "module",
   "license": "MIT",
