@@ -109,8 +109,11 @@ function resolveSchema(schema: JsonSchema | undefined, components: Record<string
   if (!schema) return undefined;
   const ref = schema.$ref;
   if (typeof ref === "string") {
-    const match = /^#\/components\/schemas\/(.+)$/.exec(ref);
-    if (match && components[match[1]]) return components[match[1]];
+    // ⚡ Bolt: Using startsWith and slice is faster than Regex for simple prefix matching
+    if (ref.startsWith("#/components/schemas/")) {
+      const name = ref.slice(21); // length of "#/components/schemas/"
+      if (components[name]) return components[name];
+    }
   }
   return schema;
 }

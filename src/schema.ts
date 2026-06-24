@@ -1,6 +1,6 @@
 import type { JsonSchema } from "./openapi-types.js";
 
-const COMPONENT_REF = /^#\/components\/schemas\/(.+)$/;
+const COMPONENT_REF_PREFIX = "#/components/schemas/";
 
 /**
  * Deep clone a JSON-compatible value.
@@ -38,9 +38,9 @@ function collectRefs(
 
   const obj = node as Record<string, unknown>;
   if (typeof obj.$ref === "string") {
-    const match = COMPONENT_REF.exec(obj.$ref);
-    if (match) {
-      const name = match[1];
+    // ⚡ Bolt: Using startsWith and slice is faster than Regex for simple prefix matching
+    if (obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
+      const name = obj.$ref.slice(21); // length of "#/components/schemas/"
       if (!seen.has(name)) {
         seen.add(name);
         if (components[name]) collectRefs(components[name], components, seen);
@@ -67,8 +67,10 @@ function rewriteRefs(node: unknown): void {
 
   const obj = node as Record<string, unknown>;
   if (typeof obj.$ref === "string") {
-    const match = COMPONENT_REF.exec(obj.$ref);
-    if (match) obj.$ref = `#/$defs/${match[1]}`;
+    // ⚡ Bolt: Using startsWith and slice is faster than Regex for simple prefix matching
+    if (obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
+      obj.$ref = `#/$defs/${obj.$ref.slice(21)}`; // length of "#/components/schemas/"
+    }
   }
 
   // ⚡ Bolt: Using for...in avoids Object.values() which allocates an array
