@@ -88,8 +88,8 @@ All configuration is via environment variables.
 | `MEALIE_BASE_URL` | ✅ | — | Base URL of your Mealie instance, e.g. `https://mealie.example.com`. |
 | `MEALIE_API_TOKEN` | – | — | Long-lived Mealie API token (sent as `Authorization: Bearer`). Most endpoints need it. `MEALIE_TOKEN` is accepted as an alias. |
 | `MEALIE_READ_ONLY` | – | `false` | When `true`, only expose `GET` endpoints. Great for a safe, read-only assistant. |
-| `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category prefixes to expose (e.g. `recipe,households_shopping_lists`). Empty = all. |
-| `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category prefixes to hide (e.g. `admin,groups_seeders`). |
+| `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category slugs to expose (e.g. `recipe,households_shopping_lists`). Empty = all. |
+| `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category slugs to hide (e.g. `admin,groups_seeders`). |
 | `MEALIE_USE_BUNDLED_SPEC` | – | `false` | Skip the live OpenAPI fetch and use the snapshot bundled with the package. |
 | `MEALIE_OPENAPI_URL` | – | `${MEALIE_BASE_URL}/openapi.json` | Override where the OpenAPI schema is fetched from. |
 | `MEALIE_TOOL_NAME_MAX` | – | `50` | Max length of generated tool names (clamped to 16–64). Lower it if your MCP client prefixes tool names (e.g. `mcp__<server>__<tool>`) and the combined name exceeds the 64-char API limit. |
@@ -99,8 +99,7 @@ All configuration is via environment variables.
 ### Reducing the number of tools
 
 Mealie has ~259 endpoints. Some MCP clients work better with fewer tools.
-Use `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` with **category prefixes** (the part
-before the verb in a tool name) to narrow things down. Examples:
+Use `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` with **category slugs** (or exact tool names) to narrow things down. Examples:
 
 ```bash
 # Only recipes, meal plans and shopping lists:
