@@ -8,14 +8,18 @@ It exposes **every endpoint of the Mealie REST API** as an MCP tool, so an LLM
 (Claude, etc.) can read and manage your recipes, meal plans, shopping lists,
 cookbooks, households, users and more.
 
-- 🧩 **Complete API coverage** — one tool per Mealie endpoint (~259 tools).
+- 🧩 **Full API coverage** — one tool per Mealie endpoint (~259), trimmed to a
+  focused default set (~211) so clients aren't overwhelmed. `MEALIE_INCLUDE_ALL=true`
+  exposes everything.
 - 🔄 **Auto-adapts to your Mealie version** — on startup it fetches the OpenAPI
   schema from *your* instance, so the tools always match exactly what your
   server supports. A bundled snapshot is used as a fallback if the fetch fails.
 - 🚀 **Zero install** — runs straight from `npx`, ideal for MCPHub, Claude
   Desktop, Cursor, and any other MCP client.
-- 🔒 **Safe by default options** — read-only mode and per-category include/exclude
-  filtering for clients that prefer fewer tools.
+- 🔒 **Safe by default options** — admin endpoints gated off by default, plus
+  read-only mode and per-category include/exclude filtering.
+- 🔑 **Flexible auth** — a static API token, or an OAuth2 client-credentials flow
+  that fetches and refreshes access tokens for you.
 
 ---
 
@@ -86,27 +90,75 @@ All configuration is via environment variables.
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `MEALIE_BASE_URL` | ✅ | — | Base URL of your Mealie instance, e.g. `https://mealie.example.com`. |
-| `MEALIE_API_TOKEN` | – | — | Long-lived Mealie API token (sent as `Authorization: Bearer`). Most endpoints need it. `MEALIE_TOKEN` is accepted as an alias. |
+| `MEALIE_API_TOKEN` | – | — | Long-lived Mealie API token (sent as `Authorization: Bearer`). Most endpoints need it. `MEALIE_TOKEN` is accepted as an alias. Ignored when OAuth is configured. |
+| `MEALIE_OAUTH_TOKEN_URL` | – | — | IdP token endpoint. Setting this (plus client id/secret) enables the OAuth2 **client-credentials** flow, which takes precedence over `MEALIE_API_TOKEN`. See [Authenticating with OAuth](#authenticating-with-oauth-client-credentials). |
+| `MEALIE_OAUTH_CLIENT_ID` | – | — | OAuth client id (required for the OAuth flow). |
+| `MEALIE_OAUTH_CLIENT_SECRET` | – | — | OAuth client secret (required for the OAuth flow). |
+| `MEALIE_OAUTH_SCOPE` | – | — | Optional space-delimited OAuth scopes. |
+| `MEALIE_OAUTH_AUDIENCE` | – | — | Optional OAuth audience (some IdPs, e.g. Auth0, need it to mint a Mealie-targeted token). |
 | `MEALIE_READ_ONLY` | – | `false` | When `true`, only expose `GET` endpoints. Great for a safe, read-only assistant. |
+| `MEALIE_INCLUDE_ADMIN` | – | `false` | Expose admin/server-ops endpoints (backups, maintenance, user/group/household management, debug, …). Off by default. |
+| `MEALIE_INCLUDE_ALL` | – | `false` | Disable **all** built-in trimming (the default-exclude list *and* the admin gate), restoring full one-tool-per-endpoint coverage. |
 | `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category slugs to expose (e.g. `recipe,households_shopping_lists`). Empty = all. |
-| `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category slugs to hide (e.g. `admin,groups_seeders`). |
+| `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category slugs to hide (e.g. `admin,groups_seeders`). Applied on top of the built-in trimming. |
 | `MEALIE_USE_BUNDLED_SPEC` | – | `false` | Skip the live OpenAPI fetch and use the snapshot bundled with the package. |
 | `MEALIE_OPENAPI_URL` | – | `${MEALIE_BASE_URL}/openapi.json` | Override where the OpenAPI schema is fetched from. |
 | `MEALIE_TOOL_NAME_MAX` | – | `50` | Max length of generated tool names (clamped to 16–64). Lower it if your MCP client prefixes tool names (e.g. `mcp__<server>__<tool>`) and the combined name exceeds the 64-char API limit. |
 | `MEALIE_TIMEOUT` | – | `60000` | Per-request timeout in milliseconds. |
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
 
+### Authenticating with OAuth (client credentials)
+
+By default the server authenticates with a static `MEALIE_API_TOKEN`. As an
+alternative — useful for headless/machine-to-machine setups — it can obtain an
+access token from your identity provider using the **OAuth2 client-credentials
+grant**, then send it as the `Authorization: Bearer` credential and refresh it
+automatically (proactively before expiry, and reactively on a `401`).
+
+```bash
+MEALIE_OAUTH_TOKEN_URL="https://idp.example.com/oauth/token"
+MEALIE_OAUTH_CLIENT_ID="your-client-id"
+MEALIE_OAUTH_CLIENT_SECRET="your-client-secret"
+# Optional, IdP-dependent:
+MEALIE_OAUTH_SCOPE="mealie"
+MEALIE_OAUTH_AUDIENCE="https://mealie.example.com"
+```
+
+When these are set, OAuth **takes precedence** and `MEALIE_API_TOKEN` is ignored.
+
+> **Precondition:** your Mealie must be a version that validates IdP-issued
+> access tokens as bearer tokens (via the provider's JWKS). The client sends
+> the credentials in the request body (`client_secret_post`). If your IdP
+> requires HTTP Basic client auth instead, open an issue.
+
 ### Reducing the number of tools
 
-Mealie has ~259 endpoints. Some MCP clients work better with fewer tools.
-Use `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` with **category slugs** (or exact tool names) to narrow things down. Examples:
+Mealie has ~259 endpoints, but **by default the server trims this to ~211** so
+MCP clients aren't overwhelmed. Two groups are removed out of the box:
+
+- **Admin / server-ops** endpoints (backups, maintenance, multi-tenant
+  user/group/household management, debug, email config, AI providers). Re-enable
+  with `MEALIE_INCLUDE_ADMIN=true`.
+- A small **default-exclude list** of endpoints with little value to an LLM:
+  password-reset and registration flows, the docker healthcheck route, the SSE
+  *stream* duplicates of plain-JSON recipe-import endpoints, and zip/file
+  download routes that return opaque bytes. (The `Users: Authentication`
+  category is kept, since the server can authenticate via OAuth.)
+
+Set `MEALIE_INCLUDE_ALL=true` to disable all trimming and expose every endpoint.
+
+You can further narrow things with `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` using
+**category slugs** (or exact tool names). Examples:
 
 ```bash
 # Only recipes, meal plans and shopping lists:
 MEALIE_TOOLS="recipe,households_mealplans,households_shopping"
 
-# Everything except admin + group seeders:
-MEALIE_EXCLUDE_TOOLS="admin,groups_seeders,groups_migrations"
+# Default trim, but also drop group seeders + migrations:
+MEALIE_EXCLUDE_TOOLS="groups_seeders,groups_migrations"
+
+# Bring back admin tools too:
+MEALIE_INCLUDE_ADMIN=true
 
 # Read-only recipe browsing assistant:
 MEALIE_READ_ONLY=true
@@ -254,8 +306,9 @@ npm run refresh-spec -- https://demo.mealie.io
 | --- | --- |
 | `src/index.ts` | Entry point: load config + spec, start stdio server. |
 | `src/config.ts` | Environment-variable configuration. |
+| `src/auth.ts` | Resolve the `Authorization` header (static token or OAuth client credentials). |
 | `src/openapi-loader.ts` | Fetch live OpenAPI schema with bundled fallback. |
-| `src/tools.ts` | Generate one MCP tool per OpenAPI operation. |
+| `src/tools.ts` | Generate one MCP tool per OpenAPI operation; built-in trimming. |
 | `src/schema.ts` | Build self-contained JSON Schemas (`$ref` → `$defs`). |
 | `src/http-client.ts` | Execute requests (JSON / urlencoded / multipart / binary). |
 | `src/server.ts` | MCP server wiring (`tools/list`, `tools/call`). |

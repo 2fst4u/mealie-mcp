@@ -292,15 +292,50 @@ function matches(tool: MealieTool, entry: string): boolean {
   );
 }
 
-/** Apply read-only / include / exclude filters from config. */
+/**
+ * Endpoints trimmed by default because they have essentially no use to an LLM
+ * client: account flows the MCP credential already replaces or that need a
+ * browser/email, a healthcheck text route, SSE stream duplicates of plain JSON
+ * endpoints, and opaque binary downloads the client can only summarize.
+ * (The `Users: Authentication` category is intentionally kept — the server can
+ * now authenticate via OAuth, so those routes are relevant.)
+ * Restore everything with MEALIE_INCLUDE_ALL=true.
+ */
+export const DEFAULT_EXCLUDE: string[] = [
+  "users_passwords", // forgot_password / reset_password (email-link flow)
+  "register_new_user", // public signup
+  "get_validation_text", // /api/media/docker/validate.txt healthcheck
+  "create_recipe_from_html_or_json_stream", // SSE duplicate of create_recipe_from_html_or_json
+  "parse_recipe_url_stream", // SSE duplicate of parse_recipe_url
+  "get_exported_data", // zip export (opaque bytes)
+  "get_exported_data_token", // zip download (opaque bytes)
+  "get_shared_recipe_as_zip", // zip download (opaque bytes)
+  "download_file", // /api/utils/download (opaque bytes)
+];
+
+/**
+ * Admin / server-ops endpoints (backups, maintenance, multi-tenant user/group/
+ * household management, debug, email config, AI providers). Powerful and rarely
+ * what a recipe assistant needs, so they are gated off unless MEALIE_INCLUDE_ADMIN
+ * (or MEALIE_INCLUDE_ALL) is set. Matches every `Admin: *` category slug.
+ */
+export const ADMIN_EXCLUDE: string[] = ["admin"];
+
+/** Apply read-only / include / exclude filters and built-in trimming from config. */
 export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
   let result = tools;
   if (config.readOnly) result = result.filter((t) => t.method === "get");
   if (config.include.length > 0) {
     result = result.filter((t) => config.include.some((e) => matches(t, e)));
   }
-  if (config.exclude.length > 0) {
-    result = result.filter((t) => !config.exclude.some((e) => matches(t, e)));
+
+  const exclude = [...config.exclude];
+  if (!config.includeAll) {
+    exclude.push(...DEFAULT_EXCLUDE);
+    if (!config.includeAdmin) exclude.push(...ADMIN_EXCLUDE);
+  }
+  if (exclude.length > 0) {
+    result = result.filter((t) => !exclude.some((e) => matches(t, e)));
   }
   return result;
 }

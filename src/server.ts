@@ -5,12 +5,13 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Config } from "./config.js";
+import type { TokenProvider } from "./auth.js";
 import { executeTool } from "./http-client.js";
 import type { MealieTool } from "./tools.js";
 
 export const SERVER_NAME = "mealie-mcp";
 
-export function createServer(config: Config, tools: MealieTool[], version: string): Server {
+export function createServer(config: Config, tools: MealieTool[], version: string, auth: TokenProvider): Server {
   const byName = new Map(tools.map((t) => [t.name, t]));
 
   const server = new Server(
@@ -36,7 +37,7 @@ export function createServer(config: Config, tools: MealieTool[], version: strin
       };
     }
     try {
-      const result = await executeTool(config, tool, (args ?? {}) as Record<string, unknown>);
+      const result = await executeTool(config, tool, (args ?? {}) as Record<string, unknown>, auth);
       return result;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
