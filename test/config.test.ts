@@ -82,19 +82,6 @@ test("OAuth and static token can coexist in config (precedence resolved at runti
   assert.ok(cfg.oauth);
 });
 
-test("parses admin / include-all trimming flags, defaulting to trimmed", () => {
-  const def = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
-  assert.equal(def.includeAdmin, false);
-  assert.equal(def.includeAll, false);
-  const on = loadConfig({
-    MEALIE_BASE_URL: "https://x",
-    MEALIE_INCLUDE_ADMIN: "true",
-    MEALIE_INCLUDE_ALL: "1",
-  } as NodeJS.ProcessEnv);
-  assert.equal(on.includeAdmin, true);
-  assert.equal(on.includeAll, true);
-});
-
 test("defaults timeout and rejects non-numeric", () => {
   const a = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
   assert.equal(a.timeoutMs, 60_000);

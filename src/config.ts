@@ -29,14 +29,10 @@ export interface Config {
   useBundledSpec: boolean;
   /** Only expose read (GET) endpoints. Useful for safe, read-only deployments. */
   readOnly: boolean;
-  /** Whitelist of tool names and/or category slugs to include. Empty = include all. */
+  /** Whitelist of tool names and/or category slugs to include. Empty = include all (within the safe baseline). */
   include: string[];
-  /** Blacklist of tool names and/or category slugs to exclude. */
+  /** Blacklist of tool names and/or category slugs to exclude (on top of the always-on baseline trim). */
   exclude: string[];
-  /** Expose admin/server-ops endpoints (backups, maintenance, user management, …). Off by default. */
-  includeAdmin: boolean;
-  /** Disable all built-in tool trimming (default-exclude list + admin gate), restoring full API coverage. */
-  includeAll: boolean;
   /** Per-request timeout in milliseconds. */
   timeoutMs: number;
   /** Optional default Accept-Language header forwarded to Mealie. */
@@ -109,8 +105,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     readOnly: bool(env.MEALIE_READ_ONLY),
     include: list(env.MEALIE_TOOLS),
     exclude: list(env.MEALIE_EXCLUDE_TOOLS),
-    includeAdmin: bool(env.MEALIE_INCLUDE_ADMIN),
-    includeAll: bool(env.MEALIE_INCLUDE_ALL),
     timeoutMs,
     acceptLanguage: env.MEALIE_ACCEPT_LANGUAGE?.trim() || undefined,
     toolNameMax,

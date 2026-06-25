@@ -10,8 +10,6 @@ function baseConfig(overrides: Partial<Config> = {}): Config {
     readOnly: false,
     include: [],
     exclude: [],
-    includeAdmin: false,
-    includeAll: false,
     timeoutMs: 60_000,
     ...overrides,
   };

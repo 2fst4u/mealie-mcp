@@ -293,13 +293,12 @@ function matches(tool: MealieTool, entry: string): boolean {
 }
 
 /**
- * Endpoints trimmed by default because they have essentially no use to an LLM
- * client: account flows the MCP credential already replaces or that need a
- * browser/email, a healthcheck text route, SSE stream duplicates of plain JSON
- * endpoints, and opaque binary downloads the client can only summarize.
+ * Endpoints with essentially no use to an LLM client: account flows the MCP
+ * credential already replaces or that need a browser/email, a healthcheck text
+ * route, SSE stream duplicates of plain JSON endpoints, and opaque binary
+ * downloads the client can only summarize.
  * (The `Users: Authentication` category is intentionally kept — the server can
- * now authenticate via OAuth, so those routes are relevant.)
- * Restore everything with MEALIE_INCLUDE_ALL=true.
+ * authenticate via OAuth, so those routes are relevant.)
  */
 export const DEFAULT_EXCLUDE: string[] = [
   "users_passwords", // forgot_password / reset_password (email-link flow)
@@ -315,27 +314,30 @@ export const DEFAULT_EXCLUDE: string[] = [
 
 /**
  * Admin / server-ops endpoints (backups, maintenance, multi-tenant user/group/
- * household management, debug, email config, AI providers). Powerful and rarely
- * what a recipe assistant needs, so they are gated off unless MEALIE_INCLUDE_ADMIN
- * (or MEALIE_INCLUDE_ALL) is set. Matches every `Admin: *` category slug.
+ * household management, debug, email config, AI providers). Powerful, rarely
+ * what a recipe assistant needs, and a security footgun, so they are never
+ * exposed. Matches every `Admin: *` category slug.
  */
 export const ADMIN_EXCLUDE: string[] = ["admin"];
 
-/** Apply read-only / include / exclude filters and built-in trimming from config. */
+/**
+ * Tools that are *never* exposed, regardless of user config. This is the safe
+ * baseline: users can narrow further via MEALIE_TOOLS / MEALIE_EXCLUDE_TOOLS,
+ * but cannot re-enable anything listed here.
+ */
+export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
+
+/** Apply the hard-exclude baseline, then read-only / include / exclude filters from config. */
 export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
-  let result = tools;
+  // Baseline trim is unconditional and applied first so user filters can only
+  // ever subtract from it, never add a hard-excluded tool back.
+  let result = tools.filter((t) => !HARD_EXCLUDE.some((e) => matches(t, e)));
   if (config.readOnly) result = result.filter((t) => t.method === "get");
   if (config.include.length > 0) {
     result = result.filter((t) => config.include.some((e) => matches(t, e)));
   }
-
-  const exclude = [...config.exclude];
-  if (!config.includeAll) {
-    exclude.push(...DEFAULT_EXCLUDE);
-    if (!config.includeAdmin) exclude.push(...ADMIN_EXCLUDE);
-  }
-  if (exclude.length > 0) {
-    result = result.filter((t) => !exclude.some((e) => matches(t, e)));
+  if (config.exclude.length > 0) {
+    result = result.filter((t) => !config.exclude.some((e) => matches(t, e)));
   }
   return result;
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateTools, filterTools, DEFAULT_EXCLUDE, ADMIN_EXCLUDE, type MealieTool } from "../src/tools.js";
+import { generateTools, filterTools, DEFAULT_EXCLUDE, ADMIN_EXCLUDE, HARD_EXCLUDE, type MealieTool } from "../src/tools.js";
 import type { Config } from "../src/config.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
 
@@ -21,10 +21,6 @@ function baseConfig(overrides: Partial<Config> = {}): Config {
     readOnly: false,
     include: [],
     exclude: [],
-    // Tests opt into built-in trimming explicitly; default to full coverage so
-    // each test exercises only the filter it's about.
-    includeAdmin: false,
-    includeAll: true,
     timeoutMs: 60_000,
     ...overrides,
   };
@@ -167,50 +163,39 @@ test("exclude filter removes matching tools", async () => {
   assert.ok(filtered.length < tools.length);
 });
 
-test("default trimming drops the default-exclude list and admin endpoints", async () => {
+test("hard baseline always drops the default-exclude list and admin endpoints", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
-  // includeAll defaults to true in baseConfig, so opt back into trimming here.
-  const trimmed = filterTools(tools, baseConfig({ includeAll: false }));
+  const trimmed = filterTools(tools, baseConfig());
 
   assert.ok(trimmed.length < tools.length, "expected fewer tools after trimming");
-  // Admin categories are gated off by default.
+  // Admin categories are never exposed.
   assert.ok(trimmed.every((t) => !t.category.startsWith("admin")));
   // Each curated default-exclude entry is gone.
   for (const name of DEFAULT_EXCLUDE) {
     assert.ok(
       !trimmed.some((t) => t.name === name || t.category === name),
-      `expected default-excluded "${name}" to be trimmed`,
+      `expected hard-excluded "${name}" to be trimmed`,
     );
   }
   // But the Users: Authentication category is kept (OAuth made it relevant).
   assert.ok(trimmed.some((t) => t.category === "users_authentication"));
 });
 
-test("MEALIE_INCLUDE_ADMIN re-enables admin endpoints, defaults stay trimmed", async () => {
+test("hard-excluded tools cannot be re-enabled via MEALIE_TOOLS include", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
-  const withAdmin = filterTools(tools, baseConfig({ includeAll: false, includeAdmin: true }));
-
-  assert.ok(withAdmin.some((t) => t.category.startsWith("admin")), "admin tools should return");
-  // The curated default-exclude list is still applied independently of admin.
-  assert.ok(!withAdmin.some((t) => t.name === "download_file"));
-});
-
-test("includeAll disables all built-in trimming", async () => {
-  const doc = await loadSnapshot();
-  const tools = generateTools(doc);
-  const all = filterTools(tools, baseConfig({ includeAll: true }));
-  assert.equal(all.length, tools.length);
-  assert.ok(all.some((t) => t.category.startsWith("admin")));
-  assert.ok(all.some((t) => t.name === "download_file"));
+  // Even explicitly allow-listing admin + a junk endpoint must not bring them back.
+  const filtered = filterTools(tools, baseConfig({ include: ["admin", "download_file"] }));
+  assert.ok(!filtered.some((t) => t.category.startsWith("admin")), "admin must stay excluded");
+  assert.ok(!filtered.some((t) => t.name === "download_file"), "junk endpoint must stay excluded");
 });
 
 test("trimming constants reference real endpoints", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
   // Guard against typos / upstream renames silently no-op'ing an exclusion.
-  for (const name of [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE]) {
+  for (const name of HARD_EXCLUDE) {
     assert.ok(
       tools.some((t) => t.name === name || t.category === name || t.category.startsWith(`${name}_`)),
       `trimming entry "${name}" matched no tool or category`,
