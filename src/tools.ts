@@ -1,5 +1,5 @@
 import type { Config } from "./config.js";
-import { buildDefs, localize } from "./schema.js";
+import { buildDefs, COMPONENT_REF_PREFIX, localize } from "./schema.js";
 import {
   HTTP_METHODS,
   type HttpMethod,
@@ -108,9 +108,9 @@ function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
 function resolveSchema(schema: JsonSchema | undefined, components: Record<string, JsonSchema>): JsonSchema | undefined {
   if (!schema) return undefined;
   const ref = schema.$ref;
-  if (typeof ref === "string") {
-    const match = /^#\/components\/schemas\/(.+)$/.exec(ref);
-    if (match && components[match[1]]) return components[match[1]];
+  if (typeof ref === "string" && ref.startsWith(COMPONENT_REF_PREFIX)) {
+    const name = ref.slice(COMPONENT_REF_PREFIX.length);
+    if (name && components[name]) return components[name];
   }
   return schema;
 }
