@@ -2,9 +2,17 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/workflows/**"
   push:
     branches-ignore:
       - main # pushes to main are handled by the release workflow
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".github/workflows/**"
 
 jobs:
   test:
