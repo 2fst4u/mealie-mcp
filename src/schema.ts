@@ -1,6 +1,6 @@
 import type { JsonSchema } from "./openapi-types.js";
 
-const COMPONENT_REF_PREFIX = "#/components/schemas/";
+export const COMPONENT_REF_PREFIX = "#/components/schemas/";
 
 /**
  * Deep clone a JSON-compatible value.
@@ -37,14 +37,11 @@ function collectRefs(
   if (!node || typeof node !== "object") return;
 
   const obj = node as Record<string, unknown>;
-  if (typeof obj.$ref === "string") {
-    // ⚡ Bolt: Using startsWith and slice is faster than Regex for simple prefix matching
-    if (obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
-      const name = obj.$ref.slice(21); // length of "#/components/schemas/"
-      if (!seen.has(name)) {
-        seen.add(name);
-        if (components[name]) collectRefs(components[name], components, seen);
-      }
+  if (typeof obj.$ref === "string" && obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
+    const name = obj.$ref.slice(COMPONENT_REF_PREFIX.length);
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      if (components[name]) collectRefs(components[name], components, seen);
     }
   }
 
@@ -66,11 +63,9 @@ function rewriteRefs(node: unknown): void {
   if (!node || typeof node !== "object") return;
 
   const obj = node as Record<string, unknown>;
-  if (typeof obj.$ref === "string") {
-    // ⚡ Bolt: Using startsWith and slice is faster than Regex for simple prefix matching
-    if (obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
-      obj.$ref = `#/$defs/${obj.$ref.slice(21)}`; // length of "#/components/schemas/"
-    }
+  if (typeof obj.$ref === "string" && obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
+    const name = obj.$ref.slice(COMPONENT_REF_PREFIX.length);
+    if (name) obj.$ref = `#/$defs/${name}`;
   }
 
   // ⚡ Bolt: Using for...in avoids Object.values() which allocates an array
