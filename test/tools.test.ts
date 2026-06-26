@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateTools, filterTools, type MealieTool } from "../src/tools.js";
+import { generateTools, filterTools, DEFAULT_EXCLUDE, ADMIN_EXCLUDE, HARD_EXCLUDE, type MealieTool } from "../src/tools.js";
 import type { Config } from "../src/config.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
 
@@ -161,4 +161,44 @@ test("exclude filter removes matching tools", async () => {
   const filtered = filterTools(tools, baseConfig({ exclude: ["admin"] }));
   assert.ok(filtered.every((t) => !t.category.startsWith("admin")));
   assert.ok(filtered.length < tools.length);
+});
+
+test("hard baseline always drops the default-exclude list and admin endpoints", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+  const trimmed = filterTools(tools, baseConfig());
+
+  assert.ok(trimmed.length < tools.length, "expected fewer tools after trimming");
+  // Admin categories are never exposed.
+  assert.ok(trimmed.every((t) => !t.category.startsWith("admin")));
+  // Each curated default-exclude entry is gone.
+  for (const name of DEFAULT_EXCLUDE) {
+    assert.ok(
+      !trimmed.some((t) => t.name === name || t.category === name),
+      `expected hard-excluded "${name}" to be trimmed`,
+    );
+  }
+  // But the Users: Authentication category is kept (OAuth made it relevant).
+  assert.ok(trimmed.some((t) => t.category === "users_authentication"));
+});
+
+test("hard-excluded tools cannot be re-enabled via MEALIE_TOOLS include", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+  // Even explicitly allow-listing admin + a junk endpoint must not bring them back.
+  const filtered = filterTools(tools, baseConfig({ include: ["admin", "download_file"] }));
+  assert.ok(!filtered.some((t) => t.category.startsWith("admin")), "admin must stay excluded");
+  assert.ok(!filtered.some((t) => t.name === "download_file"), "junk endpoint must stay excluded");
+});
+
+test("trimming constants reference real endpoints", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+  // Guard against typos / upstream renames silently no-op'ing an exclusion.
+  for (const name of HARD_EXCLUDE) {
+    assert.ok(
+      tools.some((t) => t.name === name || t.category === name || t.category.startsWith(`${name}_`)),
+      `trimming entry "${name}" matched no tool or category`,
+    );
+  }
 });

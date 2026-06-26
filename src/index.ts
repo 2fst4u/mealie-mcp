@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
+import { createTokenProvider } from "./auth.js";
 import { loadOpenApi } from "./openapi-loader.js";
 import { filterTools, generateTools } from "./tools.js";
 import { createServer, SERVER_NAME } from "./server.js";
@@ -38,11 +39,17 @@ async function main(): Promise<void> {
   log(`${SERVER_NAME} v${version}`);
   log(`Mealie: ${config.baseUrl} | spec: ${source} (${doc.info?.version ?? "unknown"} version)`);
   log(`Exposing ${tools.length}/${allTools.length} tools across ${categories.size} categories.`);
-  if (!config.token) {
-    log("No MEALIE_API_TOKEN set — only unauthenticated endpoints will succeed.");
+  if (config.oauth) {
+    log("Auth: OAuth2 client credentials (access token fetched from the IdP).");
+    if (config.token) log("Note: MEALIE_API_TOKEN is ignored because OAuth is configured.");
+  } else if (config.token) {
+    log("Auth: static MEALIE_API_TOKEN.");
+  } else {
+    log("No credentials set — only unauthenticated endpoints will succeed.");
   }
 
-  const server = createServer(config, tools, version);
+  const auth = createTokenProvider(config);
+  const server = createServer(config, tools, version, auth);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log("Server ready on stdio.");

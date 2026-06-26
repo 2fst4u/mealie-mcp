@@ -43,6 +43,45 @@ test("parses and clamps the tool-name cap", () => {
   assert.equal(ok.toolNameMax, 30);
 });
 
+test("parses OAuth client-credentials config when the full triplet is present", () => {
+  const cfg = loadConfig({
+    MEALIE_BASE_URL: "https://x",
+    MEALIE_OAUTH_TOKEN_URL: "https://idp.example.com/token",
+    MEALIE_OAUTH_CLIENT_ID: "id",
+    MEALIE_OAUTH_CLIENT_SECRET: "secret",
+    MEALIE_OAUTH_SCOPE: "mealie",
+    MEALIE_OAUTH_AUDIENCE: "https://mealie.example.com",
+  } as NodeJS.ProcessEnv);
+  assert.deepEqual(cfg.oauth, {
+    tokenUrl: "https://idp.example.com/token",
+    clientId: "id",
+    clientSecret: "secret",
+    scope: "mealie",
+    audience: "https://mealie.example.com",
+  });
+});
+
+test("ignores partial OAuth config (no token url or secret)", () => {
+  const noSecret = loadConfig({
+    MEALIE_BASE_URL: "https://x",
+    MEALIE_OAUTH_TOKEN_URL: "https://idp.example.com/token",
+    MEALIE_OAUTH_CLIENT_ID: "id",
+  } as NodeJS.ProcessEnv);
+  assert.equal(noSecret.oauth, undefined);
+});
+
+test("OAuth and static token can coexist in config (precedence resolved at runtime)", () => {
+  const cfg = loadConfig({
+    MEALIE_BASE_URL: "https://x",
+    MEALIE_API_TOKEN: "static",
+    MEALIE_OAUTH_TOKEN_URL: "https://idp.example.com/token",
+    MEALIE_OAUTH_CLIENT_ID: "id",
+    MEALIE_OAUTH_CLIENT_SECRET: "secret",
+  } as NodeJS.ProcessEnv);
+  assert.equal(cfg.token, "static");
+  assert.ok(cfg.oauth);
+});
+
 test("defaults timeout and rejects non-numeric", () => {
   const a = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
   assert.equal(a.timeoutMs, 60_000);

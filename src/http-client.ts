@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Config } from "./config.js";
+import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
 
 export type ContentBlock =
@@ -114,19 +115,23 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   };
 }
 
-export async function executeTool(config: Config, tool: MealieTool, args: Record<string, unknown>): Promise<ToolResult> {
+export async function executeTool(
+  config: Config,
+  tool: MealieTool,
+  args: Record<string, unknown>,
+  auth: TokenProvider,
+): Promise<ToolResult> {
   const url = buildUrl(config, tool, args);
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (config.token) headers.Authorization = `Bearer ${config.token}`;
-  if (config.acceptLanguage) headers["Accept-Language"] = config.acceptLanguage;
+  const baseHeaders: Record<string, string> = { Accept: "application/json" };
+  if (config.acceptLanguage) baseHeaders["Accept-Language"] = config.acceptLanguage;
 
   let payload: string | URLSearchParams | FormData | undefined;
   if (tool.body && args.body !== undefined && args.body !== null) {
     const bodyValue = args.body as Record<string, unknown>;
     if (tool.body.kind === "json") {
       payload = JSON.stringify(bodyValue);
-      headers["Content-Type"] = "application/json";
+      baseHeaders["Content-Type"] = "application/json";
     } else if (tool.body.kind === "urlencoded") {
       const params = new URLSearchParams();
       for (const [k, v] of Object.entries(bodyValue)) {
@@ -138,24 +143,39 @@ export async function executeTool(config: Config, tool: MealieTool, args: Record
     }
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  const send = async (forceRefresh: boolean): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> => {
+    const headers = { ...baseHeaders };
+    const authValue = await auth.authHeader(forceRefresh);
+    if (authValue) headers.Authorization = authValue;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: tool.method.toUpperCase(),
+        headers,
+        body: payload,
+        signal: controller.signal,
+      });
+      // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
+      const body = await readBody(res);
+      return { res, body };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   let res: Response;
   let bodyResult: { blocks: ContentBlock[]; raw: string };
   try {
-    res = await fetch(url, {
-      method: tool.method.toUpperCase(),
-      headers,
-      body: payload,
-      signal: controller.signal,
-    });
-    // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
-    bodyResult = await readBody(res);
+    ({ res, body: bodyResult } = await send(false));
+    // A 401 may mean the OAuth access token expired mid-flight; force one refresh and retry.
+    if (res.status === 401 && isRefreshable(config)) {
+      ({ res, body: bodyResult } = await send(true));
+    }
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     return { content: [text(`Request to ${tool.method.toUpperCase()} ${url} failed: ${reason}`)], isError: true };
-  } finally {
-    clearTimeout(timer);
   }
 
   const { blocks } = bodyResult;
