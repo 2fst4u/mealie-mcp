@@ -9,7 +9,7 @@ import {
   type OpenApiParameter,
 } from "./openapi-types.js";
 
-export type BodyKind = "json" | "urlencoded" | "multipart";
+type BodyKind = "json" | "urlencoded" | "multipart";
 
 export interface MealieTool {
   /** MCP tool name: `<category>_<operation>`, unique and <= 64 chars. */
@@ -56,7 +56,7 @@ function dedupeTokens(name: string): string {
 
 // Default cap for generated tool names. Kept well under the 64-char API limit
 // because clients commonly prefix names (e.g. `mcp__<server>__<tool>`).
-export const DEFAULT_NAME_MAX = 50;
+const DEFAULT_NAME_MAX = 50;
 
 function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
   const category = slug(op.tags?.[0] ?? "misc");

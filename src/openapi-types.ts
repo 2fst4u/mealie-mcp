@@ -10,11 +10,11 @@ export interface OpenApiParameter {
   schema?: JsonSchema;
 }
 
-export interface OpenApiMediaType {
+interface OpenApiMediaType {
   schema?: JsonSchema;
 }
 
-export interface OpenApiRequestBody {
+interface OpenApiRequestBody {
   required?: boolean;
   description?: string;
   content?: Record<string, OpenApiMediaType>;
@@ -34,7 +34,7 @@ export interface OpenApiOperation {
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
-export type OpenApiPathItem = Partial<Record<HttpMethod, OpenApiOperation>> & {
+type OpenApiPathItem = Partial<Record<HttpMethod, OpenApiOperation>> & {
   parameters?: OpenApiParameter[];
 };
 
