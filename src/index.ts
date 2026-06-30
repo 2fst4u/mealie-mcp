@@ -56,7 +56,8 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  const reason = err instanceof Error ? err.stack || err.message : String(err);
+  // SECURITY: Do not leak stack traces in error output to prevent exposing internals
+  const reason = err instanceof Error ? err.message : String(err);
   process.stderr.write(`[mealie-mcp] Fatal: ${reason}\n`);
   process.exit(1);
 });
