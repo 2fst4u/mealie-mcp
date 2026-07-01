@@ -282,14 +282,32 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NA
   return tools;
 }
 
-function matches(tool: MealieTool, entry: string): boolean {
-  const e = entry.toLowerCase();
-  return (
-    tool.name === e ||
-    tool.name.startsWith(`${e}_`) ||
-    tool.category === e ||
-    tool.category.startsWith(`${e}_`)
-  );
+type FilterCondition = { exact: string; prefix: string };
+
+/**
+ * ⚡ Bolt: Precomputing the exact lowercase and prefix match strings avoids
+ * repeatedly calling `toLowerCase()` and allocating template strings for
+ * every filter rule against every generated tool during initialization.
+ */
+function buildConditions(entries: string[]): FilterCondition[] {
+  return entries.map((e) => {
+    const exact = e.toLowerCase();
+    return { exact, prefix: `${exact}_` };
+  });
+}
+
+function matches(tool: MealieTool, conditions: FilterCondition[]): boolean {
+  for (const c of conditions) {
+    if (
+      tool.name === c.exact ||
+      tool.name.startsWith(c.prefix) ||
+      tool.category === c.exact ||
+      tool.category.startsWith(c.prefix)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -331,13 +349,20 @@ export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
   // Baseline trim is unconditional and applied first so user filters can only
   // ever subtract from it, never add a hard-excluded tool back.
-  let result = tools.filter((t) => !HARD_EXCLUDE.some((e) => matches(t, e)));
+  const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
+  let result = tools.filter((t) => !matches(t, hardExcludeConditions));
+
   if (config.readOnly) result = result.filter((t) => t.method === "get");
+
   if (config.include.length > 0) {
-    result = result.filter((t) => config.include.some((e) => matches(t, e)));
+    const includeConditions = buildConditions(config.include);
+    result = result.filter((t) => matches(t, includeConditions));
   }
+
   if (config.exclude.length > 0) {
-    result = result.filter((t) => !config.exclude.some((e) => matches(t, e)));
+    const excludeConditions = buildConditions(config.exclude);
+    result = result.filter((t) => !matches(t, excludeConditions));
   }
+
   return result;
 }
