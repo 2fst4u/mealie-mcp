@@ -81,10 +81,15 @@ function rewriteRefs(node: unknown): void {
  * Given a set of root schemas, build the `$defs` map containing the transitive
  * closure of component schemas they reference, with all refs rewritten to
  * `#/$defs/...`. Returns `undefined` when nothing is referenced.
+ *
+ * ⚡ Bolt: Added a cache map parameter. The cache allows reusing the localized
+ * representation of component schemas. Reusing the clones in `generateTools` avoids
+ * redundant deep clones across the tool schema definitions, improving generation speed.
  */
 export function buildDefs(
   roots: Array<JsonSchema | undefined>,
   components: Record<string, JsonSchema>,
+  cache?: Map<string, JsonSchema>,
 ): Record<string, JsonSchema> | undefined {
   const seen = new Set<string>();
   for (const root of roots) {
@@ -94,11 +99,16 @@ export function buildDefs(
 
   const defs: Record<string, JsonSchema> = {};
   for (const name of seen) {
+    if (cache?.has(name)) {
+      defs[name] = cache.get(name)!;
+      continue;
+    }
     const schema = components[name];
     if (!schema) continue;
     const copy = clone(schema);
     rewriteRefs(copy);
     defs[name] = copy;
+    if (cache) cache.set(name, copy);
   }
   return defs;
 }

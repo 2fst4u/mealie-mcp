@@ -166,6 +166,7 @@ function buildInputSchema(
   params: OpenApiParameter[],
   body: ReturnType<typeof pickBody>,
   components: Record<string, JsonSchema>,
+  defsCache: Map<string, JsonSchema>,
 ): { inputSchema: JsonSchema; pathParams: string[]; queryParams: Array<{ name: string; isArray: boolean }> } {
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];
@@ -207,7 +208,7 @@ function buildInputSchema(
   if (required.length > 0) inputSchema.required = required;
   inputSchema.additionalProperties = false;
 
-  const defs = buildDefs(rootSchemas, components);
+  const defs = buildDefs(rootSchemas, components, defsCache);
   if (defs) inputSchema.$defs = defs;
 
   return { inputSchema, pathParams, queryParams };
@@ -247,6 +248,7 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NA
   // Second pass: build tools with finalized, unique names.
   const tools: MealieTool[] = [];
   const usedNames = new Set<string>();
+  const defsCache = new Map<string, JsonSchema>();
   for (const entry of entries) {
     const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
     let name = rawName;
@@ -261,6 +263,7 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NA
       entry.params,
       entry.body,
       components,
+      defsCache,
     );
 
     tools.push({
