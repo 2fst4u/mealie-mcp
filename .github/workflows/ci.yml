@@ -1,14 +1,11 @@
 name: CI
 
+# Runs on pull_request only. A branch push that also has an open PR would
+# otherwise trigger this workflow twice for the same commit, doubling the
+# matrix. pull_request covers same-repo and fork PRs alike; pushes to main are
+# handled by the release workflow (which runs typecheck/build/test).
 on:
   pull_request:
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".github/workflows/**"
-  push:
-    branches-ignore:
-      - main # pushes to main are handled by the release workflow
     paths-ignore:
       - "**.md"
       - "docs/**"
