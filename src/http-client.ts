@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, resolve, relative, isAbsolute, sep } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -56,7 +56,7 @@ function scalar(value: unknown): string {
   return String(value);
 }
 
-async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
+export async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
   const form = new FormData();
   const fileFields = new Set(tool.body?.fileFields ?? []);
   for (const [key, value] of Object.entries(body)) {
@@ -65,8 +65,19 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
       const paths = Array.isArray(value) ? value : [value];
       for (const p of paths) {
         const filePath = String(p);
-        const data = await readFile(filePath);
-        form.append(key, new Blob([new Uint8Array(data)]), basename(filePath));
+
+        // SECURITY: Prevent Path Traversal / Arbitrary File Read
+        // Mitigate by validating the path against an allowed directory (CWD).
+        const allowedDir = process.cwd();
+        const resolvedPath = resolve(allowedDir, filePath);
+        const rel = relative(allowedDir, resolvedPath);
+
+        if (rel.startsWith(".." + sep) || rel === ".." || isAbsolute(rel)) {
+          throw new Error(`Security Error: Path traversal detected. File path must be within the allowed directory (${allowedDir}).`);
+        }
+
+        const data = await readFile(resolvedPath);
+        form.append(key, new Blob([new Uint8Array(data)]), basename(resolvedPath));
       }
     } else if (Array.isArray(value)) {
       for (const item of value) form.append(key, scalar(item));
