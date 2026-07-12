@@ -77,6 +77,36 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
   return form;
 }
 
+
+
+const MAX_BODY_BYTES = 5 * 1024 * 1024; // 5MB limit to prevent DoS via unbounded buffer allocation
+
+async function consumeSafe(res: Response): Promise<Buffer> {
+  if (!res.body) {
+    return Buffer.from(await res.arrayBuffer());
+  }
+  const reader = res.body.getReader();
+  let total = 0;
+  const chunks: Uint8Array[] = [];
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        chunks.push(value);
+        total += value.length;
+        if (total > MAX_BODY_BYTES) {
+          await reader.cancel(`Response exceeded ${MAX_BODY_BYTES} bytes`);
+          throw new Error(`Response payload exceeded maximum size of ${MAX_BODY_BYTES} bytes.`);
+        }
+      }
+    }
+    return Buffer.concat(chunks);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
   const contentType = res.headers.get("content-type") ?? "";
 
@@ -85,7 +115,7 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   }
 
   if (contentType.startsWith("image/")) {
-    const buf = Buffer.from(await res.arrayBuffer());
+    const buf = await consumeSafe(res);
     return {
       blocks: [{ type: "image", data: buf.toString("base64"), mimeType: contentType.split(";")[0] }],
       raw: `[image ${contentType} ${buf.length} bytes]`,
@@ -93,7 +123,8 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   }
 
   if (contentType.includes("application/json")) {
-    const raw = await res.text();
+    const buf = await consumeSafe(res);
+    const raw = buf.toString("utf8");
     try {
       const pretty = JSON.stringify(JSON.parse(raw), null, 2);
       return { blocks: [text(truncate(pretty))], raw };
@@ -103,12 +134,13 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   }
 
   if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
-    const raw = await res.text();
+    const buf = await consumeSafe(res);
+    const raw = buf.toString("utf8");
     return { blocks: [text(truncate(raw))], raw };
   }
 
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
-  const buf = Buffer.from(await res.arrayBuffer());
+  const buf = await consumeSafe(res);
   return {
     blocks: [text(`Received ${buf.length} bytes of binary data (${contentType || "unknown type"}).`)],
     raw: `[binary ${buf.length} bytes]`,

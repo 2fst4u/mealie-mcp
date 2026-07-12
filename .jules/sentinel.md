@@ -7,3 +7,8 @@
 **Vulnerability:** Unhandled Promise Rejections expose internal stack traces. When an uncaught exception occurred in `src/index.ts`, the application would write the complete `err.stack` to standard error, potentially leaking implementation details and internal path information in the hosting environment (especially problematic for an MCP server that may send stderr to a client).
 **Learning:** Standard output and standard error are direct communication channels for MCP servers. Emitting un-sanitized internal errors directly over these channels leaks internal application state.
 **Prevention:** Catch all root-level exceptions and limit logging to sanitised error messages (`err.message` or `String(err)`) instead of raw stack traces.
+
+## 2025-02-14 - Fix Unbounded Buffer Allocation DoS in HTTP Client
+**Vulnerability:** Denial of Service via Unbounded Buffer Allocation when buffering external API HTTP responses via `res.arrayBuffer()` and `res.text()`. If an attacker or a hijacked endpoint serves extremely large responses (e.g. gigabytes), these methods load the entire payload directly into RAM simultaneously, triggering an out-of-memory crash.
+**Learning:** External API responses cannot be fully trusted on size. Using built-in convenience methods like `Response.text()` and `Response.arrayBuffer()` is unsafe when the payload size is unbounded or unknown, even with request timeouts.
+**Prevention:** Rather than directly materializing the full response body into memory, stream the response using `Response.body.getReader()`. Keep a running total of the bytes read in a buffer and if the limit (e.g. 5MB) is exceeded, actively abort the connection using `reader.cancel()` and throw an error to protect system memory limits.
