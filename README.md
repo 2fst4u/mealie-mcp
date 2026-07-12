@@ -103,7 +103,14 @@ All configuration is via environment variables.
 | `MEALIE_OPENAPI_URL` | – | `${MEALIE_BASE_URL}/openapi.json` | Override where the OpenAPI schema is fetched from. |
 | `MEALIE_TOOL_NAME_MAX` | – | `50` | Max length of generated tool names (clamped to 16–64). Lower it if your MCP client prefixes tool names (e.g. `mcp__<server>__<tool>`) and the combined name exceeds the 64-char API limit. |
 | `MEALIE_TIMEOUT` | – | `60000` | Per-request timeout in milliseconds. |
+| `MEALIE_RETRIES` | – | `2` | Extra attempts for idempotent (`GET`) requests that hit a network error or a retryable status (`429`/`5xx`), with exponential backoff (clamped to 0–5). Non-`GET` methods are never retried automatically. Set `0` to disable. |
+| `MEALIE_DEBUG` | – | `false` | When `true`, log each outgoing request (method, path, response status) to stderr. Useful for troubleshooting from your MCP client. |
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
+
+> **Note:** Only path and query parameters are exposed as tool inputs. The few Mealie
+> endpoints that read a custom request header or cookie are not driven through those
+> parameters — `Accept-Language` is forwarded via `MEALIE_ACCEPT_LANGUAGE`, and
+> authentication is handled globally.
 
 ### Authenticating with OAuth (client credentials)
 

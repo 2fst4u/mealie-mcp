@@ -14,6 +14,8 @@ const dummyConfig: Config = {
   exclude: [],
   timeoutMs: 5000,
   toolNameMax: 50,
+  debug: false,
+  retries: 0,
 };
 
 const dummyAuth: TokenProvider = {
@@ -369,4 +371,82 @@ test("retries on 401 if token is refreshable", async () => {
   assert.equal(callCount, 2);
   assert.equal(refreshCalled, true);
   assert.match((res.content[0] as {text: string}).text, /Success/);
+});
+
+const getTool: MealieTool = {
+  name: "test_tool",
+  description: "",
+  inputSchema: { type: "object" },
+  category: "test",
+  method: "get",
+  path: "/api/data",
+  pathParams: [],
+  queryParams: [],
+  deprecated: false,
+};
+
+test("retries idempotent GET on a 503 then succeeds", async () => {
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    if (callCount < 3) {
+      return new Response("Service Unavailable", { status: 503, headers: { "content-type": "text/plain" } });
+    }
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+  assert.equal(res.isError, undefined);
+  assert.equal(callCount, 3);
+});
+
+test("gives up after exhausting retries and returns the last error", async () => {
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    return new Response("Bad Gateway", { status: 502, statusText: "Bad Gateway", headers: { "content-type": "text/plain" } });
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 1 }, getTool, {}, dummyAuth);
+  assert.equal(res.isError, true);
+  assert.equal(callCount, 2); // 1 initial + 1 retry
+  assert.match((res.content[0] as { text: string }).text, /HTTP 502/);
+});
+
+test("does not retry a non-idempotent POST on 503", async () => {
+  const postTool: MealieTool = { ...getTool, method: "post", path: "/api/data" };
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    return new Response("Service Unavailable", { status: 503, statusText: "Service Unavailable", headers: { "content-type": "text/plain" } });
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 3 }, postTool, {}, dummyAuth);
+  assert.equal(res.isError, true);
+  assert.equal(callCount, 1);
+});
+
+test("retries GET on a network error then succeeds", async () => {
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    if (callCount === 1) throw new Error("Network offline");
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+  assert.equal(res.isError, undefined);
+  assert.equal(callCount, 2);
+});
+
+test("empty error body does not report Success", async () => {
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(null, { status: 404, statusText: "Not Found", headers: { "content-length": "0" } });
+  });
+
+  const res = await executeTool(dummyConfig, getTool, {}, dummyAuth);
+  assert.equal(res.isError, true);
+  const txt = (res.content[0] as { text: string }).text;
+  assert.doesNotMatch(txt, /Success/);
+  assert.match(txt, /HTTP 404 Not Found/);
 });
