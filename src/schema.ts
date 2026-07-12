@@ -15,8 +15,8 @@ function clone<T>(value: T): T {
     for (let i = 0; i < value.length; i++) arr[i] = clone(value[i]);
     return arr as T;
   }
-  const res: any = {};
-  for (const k in value) res[k] = clone((value as any)[k]);
+  const res = {} as T;
+  for (const k in value) res[k] = clone(value[k]);
   return res;
 }
 
