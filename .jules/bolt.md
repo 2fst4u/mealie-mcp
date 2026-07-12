@@ -17,3 +17,6 @@
 ## 2024-07-08 - Caching deeply cloned component schemas
 **Learning:** When building tools from OpenAPI specifications, `buildDefs` generates an isolated schema by deeply cloning shared components and recursively resolving `$ref`s. It was executing this cloning and rewriting process redundantly across many endpoints that rely on the same schemas.
 **Action:** Added a `Map<string, JsonSchema>` cache that persists throughout the tool generation pass for a document. By passing this cache to `buildDefs`, we reuse the localized representation of components. This significantly decreased generation time by avoiding thousands of redundant deep clones and allocations, with `generateTools` iterations over 3 seconds improving from ~550 to ~750.
+## 2024-05-15 - Optimize startup by reading package.json asynchronously
+**Learning:** Startup times for Node applications can be reduced by moving synchronous file reads to asynchronous methods, allowing them to be run concurrently with other setup tasks.
+**Action:** Replaced `readFileSync` with `readFile` in `readVersion` and updated `main` to run `readVersion()` and `loadOpenApi()` concurrently using `Promise.all`.

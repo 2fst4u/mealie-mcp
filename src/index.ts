@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -14,10 +14,10 @@ function log(message: string): void {
 }
 
 /** Read this package's version from package.json (single source of truth). */
-function readVersion(): string {
+async function readVersion(): Promise<string> {
   try {
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "package.json");
-    return JSON.parse(readFileSync(pkgPath, "utf8")).version ?? "0.0.0";
+    return JSON.parse(await readFile(pkgPath, "utf8")).version ?? "0.0.0";
   } catch {
     return "0.0.0";
   }
@@ -25,9 +25,11 @@ function readVersion(): string {
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const version = readVersion();
 
-  const { doc, source } = await loadOpenApi(config);
+  const [version, { doc, source }] = await Promise.all([
+    readVersion(),
+    loadOpenApi(config)
+  ]);
   const allTools = generateTools(doc, config.toolNameMax);
   const tools = filterTools(allTools, config);
 
