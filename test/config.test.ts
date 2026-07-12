@@ -11,6 +11,13 @@ test("strips trailing slashes from base url", () => {
   assert.equal(cfg.baseUrl, "https://mealie.example.com");
 });
 
+test("rejects a malformed base url", () => {
+  assert.throws(
+    () => loadConfig({ MEALIE_BASE_URL: "not a url" } as NodeJS.ProcessEnv),
+    /MEALIE_BASE_URL is not a valid URL/,
+  );
+});
+
 test("parses token, with MEALIE_TOKEN fallback", () => {
   const a = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_API_TOKEN: "abc" } as NodeJS.ProcessEnv);
   assert.equal(a.token, "abc");
@@ -89,4 +96,22 @@ test("defaults timeout and rejects non-numeric", () => {
   assert.equal(b.timeoutMs, 5000);
   const c = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_TIMEOUT: "abc" } as NodeJS.ProcessEnv);
   assert.equal(c.timeoutMs, 60_000);
+});
+
+test("parses debug flag and defaults it off", () => {
+  const off = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
+  assert.equal(off.debug, false);
+  const on = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_DEBUG: "true" } as NodeJS.ProcessEnv);
+  assert.equal(on.debug, true);
+});
+
+test("parses and clamps retries", () => {
+  const def = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
+  assert.equal(def.retries, 2);
+  const zero = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_RETRIES: "0" } as NodeJS.ProcessEnv);
+  assert.equal(zero.retries, 0);
+  const high = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_RETRIES: "99" } as NodeJS.ProcessEnv);
+  assert.equal(high.retries, 5); // clamped down
+  const bad = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_RETRIES: "abc" } as NodeJS.ProcessEnv);
+  assert.equal(bad.retries, 2); // falls back to default
 });

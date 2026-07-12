@@ -16,8 +16,27 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
+// Statuses worth retrying for idempotent requests: rate-limiting and transient
+// server-side failures. 4xx (other than 429) are the caller's fault and repeating
+// them just wastes time.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const RETRY_BASE_DELAY_MS = 250;
+
 function text(value: string): ContentBlock {
   return { type: "text", text: value };
+}
+
+function debugLog(config: Config, message: string): void {
+  if (config.debug) process.stderr.write(`[mealie-mcp] ${message}\n`);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Exponential backoff for the Nth retry (1-based): 250ms, 500ms, 1s, … */
+function backoffMs(attempt: number): number {
+  return RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
 }
 
 function truncate(value: string): string {
@@ -36,12 +55,12 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
   }
 
   const url = new URL(config.baseUrl + path);
-  for (const { name, isArray } of tool.queryParams) {
+  for (const { name } of tool.queryParams) {
     const value = args[name];
     if (value === undefined || value === null) continue;
-    if (isArray && Array.isArray(value)) {
-      for (const item of value) url.searchParams.append(name, scalar(item));
-    } else if (Array.isArray(value)) {
+    // Array values are always expanded as repeated `key=` pairs, regardless of
+    // whether the schema declared the parameter as an array.
+    if (Array.isArray(value)) {
       for (const item of value) url.searchParams.append(name, scalar(item));
     } else {
       url.searchParams.append(name, scalar(value));
@@ -85,7 +104,10 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   const contentType = res.headers.get("content-type") ?? "";
 
   if (res.status === 204 || res.headers.get("content-length") === "0") {
-    return { blocks: [text(`Success (HTTP ${res.status}, no content).`)], raw: "" };
+    // Only call an empty body a "success"; on an error status the caller
+    // prepends the HTTP status, so a neutral note reads correctly there.
+    const message = res.ok ? `Success (HTTP ${res.status}, no content).` : "(no response body)";
+    return { blocks: [text(message)], raw: "" };
   }
 
   if (contentType.startsWith("image/")) {
@@ -169,28 +191,49 @@ export async function executeTool(
     }
   };
 
-  let res: Response;
-  let bodyResult: { blocks: ContentBlock[]; raw: string };
-  try {
-    ({ res, body: bodyResult } = await send(false));
-    // A 401 may mean the OAuth access token expired mid-flight; force one refresh and retry.
-    if (res.status === 401 && isRefreshable(config)) {
-      ({ res, body: bodyResult } = await send(true));
+  const method = tool.method.toUpperCase();
+  // Only GET is retried automatically: it is idempotent, so a repeat is safe.
+  const maxAttempts = tool.method === "get" ? (config.retries ?? 0) + 1 : 1;
+
+  for (let attempt = 1; ; attempt++) {
+    let res: Response;
+    let bodyResult: { blocks: ContentBlock[]; raw: string };
+    try {
+      ({ res, body: bodyResult } = await send(false));
+      // A 401 may mean the OAuth access token expired mid-flight; force one refresh and retry.
+      if (res.status === 401 && isRefreshable(config)) {
+        ({ res, body: bodyResult } = await send(true));
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      if (attempt < maxAttempts) {
+        const delay = backoffMs(attempt);
+        debugLog(config, `${method} ${tool.path} failed (${reason}); retrying in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+      debugLog(config, `${method} ${tool.path} → network error: ${reason}`);
+      return { content: [text(`Request to ${method} ${url} failed: ${reason}`)], isError: true };
     }
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { content: [text(`Request to ${tool.method.toUpperCase()} ${url} failed: ${reason}`)], isError: true };
+
+    debugLog(config, `${method} ${tool.path} → ${res.status}`);
+
+    if (RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
+      const delay = backoffMs(attempt);
+      debugLog(config, `${method} ${tool.path} → ${res.status}; retrying in ${delay}ms`);
+      await sleep(delay);
+      continue;
+    }
+
+    const { blocks } = bodyResult;
+    if (!res.ok) {
+      const detail = blocks.map((b) => (b.type === "text" ? b.text : "[binary]")).join("\n");
+      return {
+        content: [text(`HTTP ${res.status} ${res.statusText} from ${method} ${tool.path}\n${detail}`)],
+        isError: true,
+      };
+    }
+
+    return { content: blocks };
   }
-
-  const { blocks } = bodyResult;
-
-  if (!res.ok) {
-    const detail = blocks.map((b) => (b.type === "text" ? b.text : "[binary]")).join("\n");
-    return {
-      content: [text(`HTTP ${res.status} ${res.statusText} from ${tool.method.toUpperCase()} ${tool.path}\n${detail}`)],
-      isError: true,
-    };
-  }
-
-  return { content: blocks };
 }

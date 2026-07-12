@@ -1,4 +1,4 @@
-import type { Config } from "./config.js";
+import { DEFAULT_TOOL_NAME_MAX, type Config } from "./config.js";
 import { buildDefs, COMPONENT_REF_PREFIX, localize } from "./schema.js";
 import {
   HTTP_METHODS,
@@ -53,10 +53,6 @@ function dedupeTokens(name: string): string {
     .filter((tok, i, arr) => tok.length > 0 && tok !== arr[i - 1])
     .join("_");
 }
-
-// Default cap for generated tool names. Kept well under the 64-char API limit
-// because clients commonly prefix names (e.g. `mcp__<server>__<tool>`).
-const DEFAULT_NAME_MAX = 50;
 
 function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
   const category = slug(op.tags?.[0] ?? "misc");
@@ -310,7 +306,7 @@ function buildTools(
 }
 
 /** Generate one MealieTool per operation in the OpenAPI document. */
-export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NAME_MAX): MealieTool[] {
+export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_TOOL_NAME_MAX): MealieTool[] {
   const components = doc.components?.schemas ?? {};
 
   // First pass: collect operations and count how often each base name occurs,

@@ -44,9 +44,20 @@ export interface Config {
    * if your client adds a long prefix.
    */
   toolNameMax: number;
+  /** Log each outgoing request (method, path, status) to stderr for troubleshooting. */
+  debug: boolean;
+  /**
+   * Extra attempts for idempotent (GET) requests that fail with a network error
+   * or a retryable status (429/5xx). 0 disables retries. Non-GET methods are
+   * never retried automatically because they may not be safe to repeat.
+   */
+  retries: number;
 }
 
-const DEFAULT_TOOL_NAME_MAX = 50;
+/** Default cap for generated tool names; shared with the tool generator. */
+export const DEFAULT_TOOL_NAME_MAX = 50;
+const DEFAULT_RETRIES = 2;
+const MAX_RETRIES = 5;
 
 function bool(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
@@ -70,6 +81,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     );
   }
   const baseUrl = rawBase.replace(/\/+$/, "");
+  try {
+    // Fail fast with a clear message rather than surfacing a cryptic
+    // ERR_INVALID_URL later, on the first spec fetch or tool call.
+    // eslint-disable-next-line no-new
+    new URL(baseUrl);
+  } catch {
+    throw new Error(
+      `MEALIE_BASE_URL is not a valid URL: ${JSON.stringify(rawBase)}. ` +
+        "Use an absolute URL including the scheme, e.g. https://mealie.example.com.",
+    );
+  }
 
   const timeoutRaw = env.MEALIE_TIMEOUT?.trim();
   const timeoutMs = timeoutRaw && /^\d+$/.test(timeoutRaw) ? Number(timeoutRaw) : 60_000;
@@ -79,6 +101,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     nameMaxRaw && /^\d+$/.test(nameMaxRaw)
       ? Math.min(64, Math.max(16, Number(nameMaxRaw)))
       : DEFAULT_TOOL_NAME_MAX;
+
+  const retriesRaw = env.MEALIE_RETRIES?.trim();
+  const retries =
+    retriesRaw && /^\d+$/.test(retriesRaw)
+      ? Math.min(MAX_RETRIES, Number(retriesRaw))
+      : DEFAULT_RETRIES;
 
   const oauthTokenUrl = env.MEALIE_OAUTH_TOKEN_URL?.trim();
   const oauthClientId = env.MEALIE_OAUTH_CLIENT_ID?.trim();
@@ -108,5 +136,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timeoutMs,
     acceptLanguage: env.MEALIE_ACCEPT_LANGUAGE?.trim() || undefined,
     toolNameMax,
+    debug: bool(env.MEALIE_DEBUG),
+    retries,
   };
 }
