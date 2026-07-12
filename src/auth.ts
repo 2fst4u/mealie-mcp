@@ -80,8 +80,9 @@ class OAuthTokenProvider implements TokenProvider {
 
     const rawText = await res.text();
     if (!res.ok) {
+      // SECURITY: Do not include rawText in the error message to avoid leaking sensitive information.
       throw new Error(
-        `OAuth token request to ${this.oauth.tokenUrl} returned HTTP ${res.status} ${res.statusText}: ${rawText.slice(0, 500)}`,
+        `OAuth token request to ${this.oauth.tokenUrl} returned HTTP ${res.status} ${res.statusText}`,
       );
     }
 

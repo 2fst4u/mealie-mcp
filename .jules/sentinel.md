@@ -7,3 +7,14 @@
 **Vulnerability:** Unhandled Promise Rejections expose internal stack traces. When an uncaught exception occurred in `src/index.ts`, the application would write the complete `err.stack` to standard error, potentially leaking implementation details and internal path information in the hosting environment (especially problematic for an MCP server that may send stderr to a client).
 **Learning:** Standard output and standard error are direct communication channels for MCP servers. Emitting un-sanitized internal errors directly over these channels leaks internal application state.
 **Prevention:** Catch all root-level exceptions and limit logging to sanitised error messages (`err.message` or `String(err)`) instead of raw stack traces.
+
+## 2025-02-18 - Information Exposure through Error Logging
+
+**Vulnerability:**
+The `src/auth.ts` file logged the first 500 characters of the raw response text from the OAuth token endpoint when an error occurred (`!res.ok`). If the upstream identity provider returned sensitive data (like tokens, internal configurations, or PII) in its error responses, this information could be inadvertently logged or exposed to the user/client via the error message.
+
+**Learning:**
+Never include untrusted or potentially sensitive response bodies directly in error messages or logs, especially when interfacing with external authentication providers. The HTTP status code and status text are typically sufficient for diagnosing issues without risking information exposure.
+
+**Prevention:**
+Ensure error handling logic only includes safe, sanitized, or strictly controlled data. Omit raw response payloads from error messages unless the payload format is strictly known and guaranteed to be safe.
