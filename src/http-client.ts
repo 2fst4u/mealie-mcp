@@ -32,7 +32,9 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
     if (value === undefined || value === null) {
       throw new Error(`Missing required path parameter: ${name}`);
     }
-    path = path.replace(`{${name}}`, encodeURIComponent(String(value)));
+    // SECURITY: Use split/join instead of replace to avoid interpreting special $ replacement patterns,
+    // and to ensure all instances are replaced if a parameter occurs multiple times.
+    path = path.split(`{${name}}`).join(encodeURIComponent(String(value)));
   }
 
   const url = new URL(config.baseUrl + path);

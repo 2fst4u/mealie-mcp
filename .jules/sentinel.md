@@ -7,3 +7,7 @@
 **Vulnerability:** Unhandled Promise Rejections expose internal stack traces. When an uncaught exception occurred in `src/index.ts`, the application would write the complete `err.stack` to standard error, potentially leaking implementation details and internal path information in the hosting environment (especially problematic for an MCP server that may send stderr to a client).
 **Learning:** Standard output and standard error are direct communication channels for MCP servers. Emitting un-sanitized internal errors directly over these channels leaks internal application state.
 **Prevention:** Catch all root-level exceptions and limit logging to sanitised error messages (`err.message` or `String(err)`) instead of raw stack traces.
+## 2025-02-23 - URL Injection via Unsafe String Replacement
+**Vulnerability:** `String.prototype.replace()` interprets special `$` patterns (like `$&`, `$1`) in the replacement string, which can cause URL injection if user input contains those characters when constructing a URL path. Furthermore, `.replace(string)` only replaces the first match, missing subsequent instances of the same path variable.
+**Learning:** Always use `.split().join()` (or `.replaceAll()`) when replacing variables with potentially untrusted dynamic values in strings to avoid `$` pattern interpretation and ensure all instances are replaced.
+**Prevention:** Avoid `String.prototype.replace` for literal string replacements involving user input; prefer `split.join` or `replaceAll`.
