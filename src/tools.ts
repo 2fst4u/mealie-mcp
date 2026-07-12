@@ -224,12 +224,10 @@ interface RawEntry {
   base: string;
 }
 
-/** Generate one MealieTool per operation in the OpenAPI document. */
-export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NAME_MAX): MealieTool[] {
-  const components = doc.components?.schemas ?? {};
-
-  // First pass: collect operations and count how often each base name occurs,
-  // so we only prepend the category to names that would otherwise collide.
+function collectOperations(
+  doc: OpenApiDocument,
+  components: Record<string, JsonSchema>,
+): { entries: RawEntry[]; baseCounts: Record<string, number> } {
   const entries: RawEntry[] = [];
   const baseCounts: Record<string, number> = {};
   for (const [path, item] of Object.entries(doc.paths)) {
@@ -244,8 +242,15 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NA
       entries.push({ path, method, op, params, body, category, base });
     }
   }
+  return { entries, baseCounts };
+}
 
-  // Second pass: build tools with finalized, unique names.
+function buildTools(
+  entries: RawEntry[],
+  baseCounts: Record<string, number>,
+  components: Record<string, JsonSchema>,
+  nameMax: number,
+): MealieTool[] {
   const tools: MealieTool[] = [];
   const usedNames = new Set<string>();
   const defsCache = new Map<string, JsonSchema>();
@@ -283,6 +288,18 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NA
   }
 
   return tools;
+}
+
+/** Generate one MealieTool per operation in the OpenAPI document. */
+export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_NAME_MAX): MealieTool[] {
+  const components = doc.components?.schemas ?? {};
+
+  // First pass: collect operations and count how often each base name occurs,
+  // so we only prepend the category to names that would otherwise collide.
+  const { entries, baseCounts } = collectOperations(doc, components);
+
+  // Second pass: build tools with finalized, unique names.
+  return buildTools(entries, baseCounts, components, nameMax);
 }
 
 type FilterCondition = { exact: string; prefix: string };
