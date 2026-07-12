@@ -63,9 +63,13 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
     if (value === undefined || value === null) continue;
     if (fileFields.has(key)) {
       const paths = Array.isArray(value) ? value : [value];
-      for (const p of paths) {
+      const filePromises = paths.map(async (p) => {
         const filePath = String(p);
         const data = await readFile(filePath);
+        return { filePath, data };
+      });
+      const files = await Promise.all(filePromises);
+      for (const { filePath, data } of files) {
         form.append(key, new Blob([new Uint8Array(data)]), basename(filePath));
       }
     } else if (Array.isArray(value)) {
