@@ -54,13 +54,31 @@ jobs:
       # working tree only — no commit or tag yet — so the build, tests and npm
       # publish all see the new version. The commit + tag are pushed at the very
       # end, only after everything succeeds (see "Commit, tag & push").
-      - name: Bump patch version
+      #
+      # The next version is derived from the highest existing release *tag*, not
+      # from package.json. The bump commit is pushed to main with [skip ci] and
+      # can lag main whenever several PRs merge in a burst, so a package.json
+      # basis made every queued release compute the same patch and collide on an
+      # already-existing tag. Tags are the durable record of what shipped, so
+      # basing the bump on them keeps serialized/queued runs strictly monotonic.
+      - name: Determine next version
         id: bump
         run: |
-          NEW_VERSION=$(npm version patch --no-git-tag-version)
-          echo "version=${NEW_VERSION#v}" >> "$GITHUB_OUTPUT"
-          echo "tag=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "::notice::Releasing $NEW_VERSION"
+          git fetch --tags --force origin
+          next() { node -e "const p=process.argv[1].split('.').map(Number);p[2]++;console.log(p.join('.'))" "$1"; }
+          LATEST=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -n1)
+          NEXT=$(next "${LATEST:-0.0.0}")
+          # Belt-and-braces: skip forward over any patch already taken as a tag or
+          # already on npm (e.g. a prior partial run that published without a tag).
+          NAME=$(node -p "require('./package.json').name")
+          while git rev-parse -q --verify "refs/tags/v$NEXT" >/dev/null \
+             || npm view "$NAME@$NEXT" version >/dev/null 2>&1; do
+            NEXT=$(next "$NEXT")
+          done
+          npm version "$NEXT" --no-git-tag-version --allow-same-version >/dev/null
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEXT" >> "$GITHUB_OUTPUT"
+          echo "::notice::Releasing v$NEXT"
 
       - name: Type check
         run: npm run typecheck
@@ -101,6 +119,13 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(release): v$VERSION [skip ci]"
+          # main may have advanced while this release ran (e.g. a burst of PR
+          # merges queuing several releases). Rebase our single [skip ci] bump
+          # commit onto the latest main so the push is a fast-forward instead of
+          # being rejected — the tag is already computed to be unique, so runs
+          # never fight over it. Tag *after* the rebase so the annotated tag
+          # points at the commit that actually lands on main.
+          git pull --rebase origin main
           # Annotated tag + explicit push: `--follow-tags` only pushes annotated
           # tags, and the GitHub release step needs the tag on the remote.
           git tag -a "$TAG" -m "v$VERSION"
