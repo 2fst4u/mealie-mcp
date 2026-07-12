@@ -161,13 +161,7 @@ function pickBody(
   return first ? { kind: "json", schema: first.schema, required, fileFields: [] } : undefined;
 }
 
-function buildInputSchema(
-  op: OpenApiOperation,
-  params: OpenApiParameter[],
-  body: ReturnType<typeof pickBody>,
-  components: Record<string, JsonSchema>,
-  defsCache: Map<string, JsonSchema>,
-): { inputSchema: JsonSchema; pathParams: string[]; queryParams: Array<{ name: string; isArray: boolean }> } {
+function processParams(params: OpenApiParameter[]) {
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];
   const pathParams: string[] = [];
@@ -190,6 +184,14 @@ function buildInputSchema(
     }
   }
 
+  return { properties, required, pathParams, queryParams, rootSchemas };
+}
+
+function processBody(op: OpenApiOperation, body: ReturnType<typeof pickBody>) {
+  const properties: Record<string, JsonSchema> = {};
+  const required: string[] = [];
+  const rootSchemas: Array<JsonSchema | undefined> = [];
+
   if (body?.schema) {
     const bodySchema = localize(body.schema) ?? {};
     if (op.requestBody?.description && !bodySchema.description) {
@@ -204,6 +206,23 @@ function buildInputSchema(
     if (body.required) required.push("body");
   }
 
+  return { properties, required, rootSchemas };
+}
+
+function buildInputSchema(
+  op: OpenApiOperation,
+  params: OpenApiParameter[],
+  body: ReturnType<typeof pickBody>,
+  components: Record<string, JsonSchema>,
+  defsCache: Map<string, JsonSchema>,
+): { inputSchema: JsonSchema; pathParams: string[]; queryParams: Array<{ name: string; isArray: boolean }> } {
+  const parsedParams = processParams(params);
+  const parsedBody = processBody(op, body);
+
+  const properties: Record<string, JsonSchema> = { ...parsedParams.properties, ...parsedBody.properties };
+  const required: string[] = [...parsedParams.required, ...parsedBody.required];
+  const rootSchemas: Array<JsonSchema | undefined> = [...parsedParams.rootSchemas, ...parsedBody.rootSchemas];
+
   const inputSchema: JsonSchema = { type: "object", properties };
   if (required.length > 0) inputSchema.required = required;
   inputSchema.additionalProperties = false;
@@ -211,7 +230,7 @@ function buildInputSchema(
   const defs = buildDefs(rootSchemas, components, defsCache);
   if (defs) inputSchema.$defs = defs;
 
-  return { inputSchema, pathParams, queryParams };
+  return { inputSchema, pathParams: parsedParams.pathParams, queryParams: parsedParams.queryParams };
 }
 
 interface RawEntry {
