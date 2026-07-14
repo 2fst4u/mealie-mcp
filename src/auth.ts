@@ -61,6 +61,7 @@ class OAuthTokenProvider implements TokenProvider {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;
+    let rawText: string;
     try {
       res = await fetch(this.oauth.tokenUrl, {
         method: "POST",
@@ -71,6 +72,8 @@ class OAuthTokenProvider implements TokenProvider {
         body,
         signal: controller.signal,
       });
+      // SECURITY: Ensure body is read within the timeout window
+      rawText = await res.text();
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(`OAuth token request to ${this.oauth.tokenUrl} failed: ${reason}`);
@@ -78,7 +81,6 @@ class OAuthTokenProvider implements TokenProvider {
       clearTimeout(timer);
     }
 
-    const rawText = await res.text();
     if (!res.ok) {
       // SECURITY: Do not include rawText in the error message to avoid leaking sensitive information.
       throw new Error(
