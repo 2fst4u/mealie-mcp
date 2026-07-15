@@ -120,6 +120,12 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
 
   if (contentType.includes("application/json")) {
     const raw = await res.text();
+    // ⚡ Bolt: Avoid expensive parsing and stringifying if the result is going
+    // to be heavily truncated anyway. MAX_TEXT * 5 is an arbitrary threshold
+    // indicating the raw JSON is already huge (e.g. 500KB+).
+    if (raw.length > MAX_TEXT * 5) {
+      return { blocks: [text(truncate(raw))], raw };
+    }
     try {
       const pretty = JSON.stringify(JSON.parse(raw), null, 2);
       return { blocks: [text(truncate(pretty))], raw };
