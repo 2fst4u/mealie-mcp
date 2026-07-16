@@ -324,7 +324,7 @@ npm run refresh-spec -- https://demo.mealie.io
 This repo ships two GitHub Actions workflows:
 
 - **CI** (`.github/workflows/ci.yml`) — runs type-check, build and tests on every
-  pull request (and on non-`main` branch pushes) across Node 18/20/22.
+  pull request across Node 18/20/22.
 - **Release** (`.github/workflows/release.yml`) — on every push/merge to `main` that touches source files,
   builds and tests, auto-bumps the patch version, creates a GitHub Release `v<version>` (with auto-generated
   notes), and publishes to npm.

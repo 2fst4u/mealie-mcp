@@ -13,7 +13,7 @@ export interface OAuthConfig {
 }
 
 export interface Config {
-  /** Base URL of the Mealie instance, e.g. https://mealie.example.com (no trailing slash). */
+  /** Base URL of the Mealie instance, e.g. https://mealie.example.com. */
   baseUrl: string;
   /** Long-lived Mealie API token (Authorization: Bearer <token>). Optional but most endpoints need it. */
   token?: string;
