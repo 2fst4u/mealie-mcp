@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateTools, filterTools, DEFAULT_EXCLUDE, ADMIN_EXCLUDE, HARD_EXCLUDE, type MealieTool } from "../src/tools.js";
+import { generateTools, filterTools, DEFAULT_EXCLUDE, HARD_EXCLUDE, type MealieTool } from "../src/tools.js";
 import type { Config } from "../src/config.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
 
