@@ -24,3 +24,6 @@
 ## 2025-02-28 - Skip Expensive JSON Pretty-Printing for Truncated Payloads
 **Learning:** Formatting very large JSON payloads using `JSON.stringify(JSON.parse(raw), null, 2)` causes significant CPU and memory overhead. If the formatted output is ultimately going to be truncated down to a fixed maximum length (e.g. 100,000 characters), executing this formatting over megabytes of JSON is a waste of resources. Our benchmarks showed skipping parsing when `raw.length` far exceeds the truncate limit drops processing time from over 100ms to 0ms for large payloads.
 **Action:** When pretty-printing or formatting strings that will later be heavily truncated, check if the raw string size implies it will exceed the limit anyway. If it does (e.g., `raw.length > MAX_TEXT * 5`), bypass the expensive formatting and return the truncated raw string instead.
+## 2025-02-14 - Optimize OpenAPI path iteration in generateTools
+**Learning:** Replaced `Object.entries()` with `for...in` loop to avoid intermediate array allocation when iterating over the large `doc.paths` object.
+**Action:** Changed `for (const [path, item] of Object.entries(doc.paths))` to `for (const path in doc.paths)` and accessed `doc.paths[path]` inside the loop directly in `src/tools.ts`.
