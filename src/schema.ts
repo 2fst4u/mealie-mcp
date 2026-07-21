@@ -11,9 +11,7 @@ export const COMPONENT_REF_PREFIX = "#/components/schemas/";
 function clone<T>(value: T): T {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) {
-    const arr = new Array(value.length);
-    for (let i = 0; i < value.length; i++) arr[i] = clone(value[i]);
-    return arr as T;
+    return value.map(v => clone(v)) as unknown as T;
   }
   const res = {} as T;
   for (const k in value) res[k] = clone(value[k]);
