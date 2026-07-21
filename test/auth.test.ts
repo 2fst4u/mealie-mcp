@@ -67,6 +67,16 @@ test("OAuth provider fetches a bearer token and sends the client-credentials gra
   }
 });
 
+test("OAuth provider surfaces a clear error when token response is missing access_token", async () => {
+  const fetchStub = stubFetch([{ status: 200, body: { token_type: "Bearer" } }]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(() => provider.authHeader(), /OAuth token response from https:\/\/idp\.example\.com\/token did not include an access_token\./);
+  } finally {
+    fetchStub.restore();
+  }
+});
+
 test("OAuth provider surfaces a clear error when token response is invalid JSON", async () => {
   const fetchStub = stubFetch([{ status: 200, body: "not valid json" }]);
   try {
