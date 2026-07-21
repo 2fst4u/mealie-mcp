@@ -30,3 +30,6 @@
 **Learning:** Native Array.prototype.map() is generally more optimized by modern JavaScript JIT compilers (like V8) than manual for loops that pre-allocate arrays, especially for large, highly-nested structures, due to better internal memory management for array creation and iteration. Replacing manual loops with map improved performance by 10-15% on deep cloning of arrays.
 
 **Action:** Replaced manual for loop in src/schema.ts clone function with value.map(v => clone(v)).
+## 2025-02-14 - Optimize OpenAPI path iteration in generateTools
+**Learning:** Replaced `Object.entries()` with `for...in` loop to avoid intermediate array allocation when iterating over the large `doc.paths` object.
+**Action:** Changed `for (const [path, item] of Object.entries(doc.paths))` to `for (const path in doc.paths)` and accessed `doc.paths[path]` inside the loop directly in `src/tools.ts`.
