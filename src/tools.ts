@@ -245,7 +245,8 @@ function collectOperations(
 ): { entries: RawEntry[]; baseCounts: Record<string, number> } {
   const entries: RawEntry[] = [];
   const baseCounts: Record<string, number> = {};
-  for (const [path, item] of Object.entries(doc.paths)) {
+  for (const path in doc.paths) {
+    const item = doc.paths[path]!;
     const sharedParams = item.parameters ?? [];
     for (const method of HTTP_METHODS) {
       const op = item[method];
