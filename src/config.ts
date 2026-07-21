@@ -72,7 +72,7 @@ function list(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+function parseBaseUrl(env: NodeJS.ProcessEnv): string {
   const rawBase = env.MEALIE_BASE_URL?.trim();
   if (!rawBase) {
     throw new Error(
@@ -92,51 +92,59 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
         "Use an absolute URL including the scheme, e.g. https://mealie.example.com.",
     );
   }
+  return baseUrl;
+}
 
+function parseTimeout(env: NodeJS.ProcessEnv): number {
   const timeoutRaw = env.MEALIE_TIMEOUT?.trim();
-  const timeoutMs = timeoutRaw && /^\d+$/.test(timeoutRaw) ? Number(timeoutRaw) : 60_000;
+  return timeoutRaw && /^\d+$/.test(timeoutRaw) ? Number(timeoutRaw) : 60_000;
+}
 
+function parseToolNameMax(env: NodeJS.ProcessEnv): number {
   const nameMaxRaw = env.MEALIE_TOOL_NAME_MAX?.trim();
-  const toolNameMax =
-    nameMaxRaw && /^\d+$/.test(nameMaxRaw)
-      ? Math.min(64, Math.max(16, Number(nameMaxRaw)))
-      : DEFAULT_TOOL_NAME_MAX;
+  return nameMaxRaw && /^\d+$/.test(nameMaxRaw)
+    ? Math.min(64, Math.max(16, Number(nameMaxRaw)))
+    : DEFAULT_TOOL_NAME_MAX;
+}
 
+function parseRetries(env: NodeJS.ProcessEnv): number {
   const retriesRaw = env.MEALIE_RETRIES?.trim();
-  const retries =
-    retriesRaw && /^\d+$/.test(retriesRaw)
-      ? Math.min(MAX_RETRIES, Number(retriesRaw))
-      : DEFAULT_RETRIES;
+  return retriesRaw && /^\d+$/.test(retriesRaw)
+    ? Math.min(MAX_RETRIES, Number(retriesRaw))
+    : DEFAULT_RETRIES;
+}
 
+function parseOAuth(env: NodeJS.ProcessEnv): OAuthConfig | undefined {
   const oauthTokenUrl = env.MEALIE_OAUTH_TOKEN_URL?.trim();
   const oauthClientId = env.MEALIE_OAUTH_CLIENT_ID?.trim();
   const oauthClientSecret = env.MEALIE_OAUTH_CLIENT_SECRET?.trim();
   // Enable OAuth only when the full client-credentials triplet is present;
   // a partial config is treated as "not configured" rather than silently broken.
-  const oauth: OAuthConfig | undefined =
-    oauthTokenUrl && oauthClientId && oauthClientSecret
-      ? {
-          tokenUrl: oauthTokenUrl,
-          clientId: oauthClientId,
-          clientSecret: oauthClientSecret,
-          scope: env.MEALIE_OAUTH_SCOPE?.trim() || undefined,
-          audience: env.MEALIE_OAUTH_AUDIENCE?.trim() || undefined,
-        }
-      : undefined;
+  return oauthTokenUrl && oauthClientId && oauthClientSecret
+    ? {
+        tokenUrl: oauthTokenUrl,
+        clientId: oauthClientId,
+        clientSecret: oauthClientSecret,
+        scope: env.MEALIE_OAUTH_SCOPE?.trim() || undefined,
+        audience: env.MEALIE_OAUTH_AUDIENCE?.trim() || undefined,
+      }
+    : undefined;
+}
 
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
-    baseUrl,
+    baseUrl: parseBaseUrl(env),
     token: env.MEALIE_API_TOKEN?.trim() || env.MEALIE_TOKEN?.trim() || undefined,
-    oauth,
+    oauth: parseOAuth(env),
     openapiUrl: env.MEALIE_OPENAPI_URL?.trim() || undefined,
     useBundledSpec: bool(env.MEALIE_USE_BUNDLED_SPEC),
     readOnly: bool(env.MEALIE_READ_ONLY),
     include: list(env.MEALIE_TOOLS),
     exclude: list(env.MEALIE_EXCLUDE_TOOLS),
-    timeoutMs,
+    timeoutMs: parseTimeout(env),
     acceptLanguage: env.MEALIE_ACCEPT_LANGUAGE?.trim() || undefined,
-    toolNameMax,
+    toolNameMax: parseToolNameMax(env),
     debug: bool(env.MEALIE_DEBUG),
-    retries,
+    retries: parseRetries(env),
   };
 }
