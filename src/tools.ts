@@ -48,10 +48,18 @@ function operationName(operationId: string | undefined, path: string, method: st
 
 /** Collapse immediately repeated tokens, e.g. `recipe_recipe_get` -> `recipe_get`. */
 function dedupeTokens(name: string): string {
-  return name
-    .split("_")
-    .filter((tok, i, arr) => tok.length > 0 && tok !== arr[i - 1])
-    .join("_");
+  const parts = name.split("_");
+  let result = "";
+  let last = "";
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.length > 0 && p !== last) {
+      if (result.length > 0) result += "_";
+      result += p;
+      last = p;
+    }
+  }
+  return result;
 }
 
 function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
