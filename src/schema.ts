@@ -14,7 +14,10 @@ function clone<T>(value: T): T {
     return value.map(v => clone(v)) as unknown as T;
   }
   const res = {} as T;
-  for (const k in value) res[k] = clone(value[k]);
+  for (const k in value) {
+    if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
+    res[k] = clone(value[k]);
+  }
   return res;
 }
 
