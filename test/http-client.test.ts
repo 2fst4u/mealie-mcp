@@ -233,6 +233,32 @@ test("formats and truncates JSON response", async () => {
   assert.ok(txt.includes("[truncated"));
 });
 
+test("handles invalid JSON response gracefully", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/invalid-json",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response("{ invalid json }", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as {text: string}).text;
+  assert.equal(txt, "{ invalid json }");
+});
+
 test("handles non-JSON text/yaml response", async () => {
   const tool: MealieTool = {
     name: "test_tool",
