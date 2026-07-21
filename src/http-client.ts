@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
@@ -84,6 +84,15 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
       const paths = Array.isArray(value) ? value : [value];
       const filePromises = paths.map(async (p) => {
         const filePath = String(p);
+        // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
+        const stats = await stat(filePath);
+        if (!stats.isFile()) {
+          throw new Error(`Upload failed: ${filePath} is not a regular file.`);
+        }
+        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+        if (stats.size > MAX_FILE_SIZE) {
+          throw new Error(`Upload failed: ${filePath} exceeds the maximum allowed size of 50MB.`);
+        }
         const data = await readFile(filePath);
         return { filePath, data };
       });
