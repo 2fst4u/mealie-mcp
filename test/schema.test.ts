@@ -7,6 +7,22 @@ test("localize handles undefined", () => {
   assert.equal(localize(undefined), undefined);
 });
 
+test("localize prevents prototype pollution", () => {
+  const payload = '{"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted2":"yes"}},"prototype":{"polluted3":"yes"},"type":"string"}';
+  const schema = JSON.parse(payload);
+  const localized = localize(schema);
+
+  // Property should not exist on object prototype
+  assert.equal((Object.prototype as any).polluted, undefined);
+  assert.equal((Object.prototype as any).polluted2, undefined);
+  assert.equal((Object.prototype as any).polluted3, undefined);
+
+  // Property should not exist on the cloned result
+  assert.equal((localized as any).__proto__, Object.prototype);
+  assert.equal((localized as any).constructor, Object);
+  assert.equal((localized as any).prototype, undefined);
+});
+
 test("localize deep clones a schema without refs", () => {
   const schema: JsonSchema = { type: "string", example: "test" };
   const localized = localize(schema);

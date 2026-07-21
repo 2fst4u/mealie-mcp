@@ -23,3 +23,7 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Arbitrary file reading vulnerability that could lead to DoS. The application read files dynamically based on paths provided for multipart uploads. It lacked checks to determine if the provided path pointed to a regular file or a character device like `/dev/urandom`, or if the file was exceptionally large. Reading from a continuous stream device or an extremely large file into memory would exhaust system memory, crashing the service.
 **Learning:** Never trust a file path provided in a request for upload without validating the file's metadata first. Naively reading any path provided to `fs.promises.readFile` can trap the process in a potentially infinite or memory-exhausting read operation.
 **Prevention:** Always use `fs.promises.stat(filePath)` to verify `stats.isFile()` is true and that `stats.size` is within acceptable bounds (e.g. 50MB) before attempting to read the file contents into memory.
+## 2026-07-21 - Prototype Pollution in deep clone
+**Vulnerability:** Prototype pollution in deep clone function when iterating over object keys without filtering dangerous keys.
+**Learning:** The `clone` function iterates over all properties (including `__proto__`, `constructor`, and `prototype`) leading to prototype pollution when deeply cloning an object parsed from user input.
+**Prevention:** Add a guard to skip keys: `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;` when deeply cloning objects via `for...in`.
