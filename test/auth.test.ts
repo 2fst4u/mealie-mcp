@@ -37,6 +37,9 @@ function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
     calls.push({ url: String(url), body: params?.toString() ?? "" });
     const r = responses[Math.min(i, responses.length - 1)];
     i += 1;
+    if (r.status === -1) {
+      throw new Error("Network error");
+    }
     return {
       ok: (r.status ?? 200) < 400,
       status: r.status ?? 200,
@@ -125,6 +128,16 @@ test("OAuth provider surfaces a clear error on a non-2xx token response", async 
   try {
     const provider = createTokenProvider(oauthConfig());
     await assert.rejects(() => provider.authHeader(), /HTTP 401/);
+  } finally {
+    fetchStub.restore();
+  }
+});
+
+test("OAuth provider surfaces a clear error when fetch rejects (e.g., network error)", async () => {
+  const fetchStub = stubFetch([{ status: -1, body: "" }]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(() => provider.authHeader(), /OAuth token request to https:\/\/idp\.example\.com\/token failed: Network error/);
   } finally {
     fetchStub.restore();
   }
