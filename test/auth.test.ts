@@ -67,6 +67,16 @@ test("OAuth provider fetches a bearer token and sends the client-credentials gra
   }
 });
 
+test("OAuth provider surfaces a clear error when token response is invalid JSON", async () => {
+  const fetchStub = stubFetch([{ status: 200, body: "not valid json" }]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(() => provider.authHeader(), /OAuth token response from https:\/\/idp\.example\.com\/token was not valid JSON\./);
+  } finally {
+    fetchStub.restore();
+  }
+});
+
 test("OAuth provider caches the token within its lifetime", async () => {
   const fetchStub = stubFetch([{ body: { access_token: "abc", expires_in: 3600 } }]);
   try {
