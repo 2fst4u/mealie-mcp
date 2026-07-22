@@ -3,6 +3,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   type CallToolResult,
+  type CallToolRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Config } from "./config.js";
 import type { TokenProvider } from "./auth.js";
@@ -27,26 +28,35 @@ export function createServer(config: Config, tools: MealieTool[], version: strin
     })),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    const { name, arguments: args } = request.params;
-    const tool = byName.get(name);
-    if (!tool) {
-      return {
-        content: [{ type: "text", text: `Unknown tool: ${name}` }],
-        isError: true,
-      };
-    }
-    try {
-      const result = await executeTool(config, tool, (args ?? {}) as Record<string, unknown>, auth);
-      return result;
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      return {
-        content: [{ type: "text", text: `Error executing ${name}: ${reason}` }],
-        isError: true,
-      };
-    }
-  });
+  server.setRequestHandler(CallToolRequestSchema, (request) =>
+    handleToolCall(request, config, byName, auth)
+  );
 
   return server;
+}
+
+async function handleToolCall(
+  request: CallToolRequest,
+  config: Config,
+  byName: Map<string, MealieTool>,
+  auth: TokenProvider
+): Promise<CallToolResult> {
+  const { name, arguments: args } = request.params;
+  const tool = byName.get(name);
+  if (!tool) {
+    return {
+      content: [{ type: "text", text: `Unknown tool: ${name}` }],
+      isError: true,
+    };
+  }
+  try {
+    const result = await executeTool(config, tool, (args ?? {}) as Record<string, unknown>, auth);
+    return result;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      content: [{ type: "text", text: `Error executing ${name}: ${reason}` }],
+      isError: true,
+    };
+  }
 }
