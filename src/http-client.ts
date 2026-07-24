@@ -1,5 +1,6 @@
-import { stat } from "node:fs/promises";
-import { openAsBlob } from "node:fs";
+import { stat, readFile } from "node:fs/promises";
+import * as fs from "node:fs";
+const openAsBlob = typeof (fs as any).openAsBlob === "function" ? (fs as any).openAsBlob : undefined;
 import { basename } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
@@ -94,12 +95,18 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
         if (stats.size > MAX_FILE_SIZE) {
           throw new Error(`Upload failed: ${filePath} exceeds the maximum allowed size of 50MB.`);
         }
-        const blob = await openAsBlob(filePath);
-        return { filePath, blob };
+        if (openAsBlob) {
+          const blob = await openAsBlob(filePath);
+          return { filePath, blob };
+        } else {
+          const data = await readFile(filePath);
+          const blob = new Blob([new Uint8Array(data)]);
+          return { filePath, blob };
+        }
       });
       const files = await Promise.all(filePromises);
       for (const { filePath, blob } of files) {
-        form.append(key, blob, basename(filePath));
+        form.append(key, blob as unknown as Blob, basename(filePath));
       }
     } else if (Array.isArray(value)) {
       for (const item of value) form.append(key, scalar(item));
