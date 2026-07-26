@@ -45,4 +45,8 @@
 
 **Learning:** When dealing with potentially large file uploads (up to 50MB) via `FormData` in Node.js, using `readFile` causes the entire file to be loaded into memory, leading to increased memory footprint and garbage collection pauses. Node's `fs.openAsBlob` provides a memory-efficient alternative that works seamlessly with `FormData`, allowing the `fetch` implementation to stream the file directly from disk without allocating massive V8 strings/buffers.
 
-**Action:** Replaced `readFile(filePath)` with `openAsBlob(filePath)` in the `buildMultipart` function in `src/http-client.ts`. This bypasses buffering large files into memory during multi-part HTTP requests. This yielded an improvement of ~328ms for 40MB files.
+**Action:** Replaced `readFile(filePath)` with `openAsBlob(filePath)` in the `buildMultipart` function in `src/http-client.ts`. This bypasses buffering large files into memory during multi-part HTTP requests.
+
+**Correction on the measurement:** the ~328ms figure was for *mounting* a 40MB file into `FormData`, which is not the end-to-end win it looks like — the bytes still have to be read during `fetch`, so the read cost is moved rather than removed. The durable benefit is memory: no 40MB `Buffer` in the V8 heap and no GC pressure from it. Benchmark the whole request, not just the `FormData` construction, before quoting a latency number.
+
+**Follow-up:** `openAsBlob` is Node >= 19.8 and `engines` still allows 18, so it has to be feature-detected off the `node:fs` namespace. A static `import { openAsBlob } from "node:fs"` is a link-time `SyntaxError` on a runtime that lacks the export, which fails the entire module rather than the one code path. Feature-detection needs no `any`: `typeof fs.openAsBlob | undefined` types it exactly.
