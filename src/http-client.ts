@@ -1,6 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import * as fs from "node:fs";
-import { basename, extname } from "node:path";
+import { basename, extname, sep } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -121,17 +121,55 @@ function scalar(value: unknown): string {
   return String(value);
 }
 
-async function readUpload(filePath: string): Promise<{ filePath: string; blob: Blob }> {
-  // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
-  let stats;
+/**
+ * Resolve the allowlist once per request. Each entry is realpath'd so a
+ * symlinked allowed directory still matches, and given a trailing separator so
+ * `/srv/uploads` cannot be satisfied by `/srv/uploads-evil`. Entries that do
+ * not resolve (typo, not mounted) are dropped rather than throwing: a bad entry
+ * must never widen the allowlist, and dropping it can only narrow.
+ */
+async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
+  const resolved = await Promise.all(
+    dirs.map(async (dir) => {
+      try {
+        const real = await realpath(dir);
+        return real.endsWith(sep) ? real : real + sep;
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+  return resolved.filter((dir): dir is string => dir !== undefined);
+}
+
+async function readUpload(
+  filePath: string,
+  allowedDirs: string[] | undefined,
+): Promise<{ filePath: string; blob: Blob }> {
+  // SECURITY: the path comes from the model, so resolve symlinks before doing
+  // anything else and then use only the real path. Checking the path as given
+  // and reading it afterwards would let a symlink inside an allowed directory
+  // point anywhere on the box — a lexical `resolve()` cannot see through one.
+  let realPath: string;
   try {
-    stats = await stat(filePath);
+    realPath = await realpath(filePath);
   } catch (err) {
     // Paths here come from a model, so a bare ENOENT/EACCES is worth restating
     // in terms of the upload it broke.
     const reason = err instanceof Error ? err.message : String(err);
     throw new Error(`Upload failed: cannot read ${filePath} (${reason}).`);
   }
+
+  if (allowedDirs && !allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {
+    // Deliberately reports the real path: when a symlink is what pushed the
+    // upload out of bounds, naming only the link makes the refusal baffling.
+    throw new Error(
+      `Upload failed: ${filePath} resolves to ${realPath}, which is outside MEALIE_ALLOWED_UPLOAD_DIRS.`,
+    );
+  }
+
+  // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
+  const stats = await stat(realPath);
   if (!stats.isFile()) {
     throw new Error(`Upload failed: ${filePath} is not a regular file.`);
   }
@@ -139,22 +177,35 @@ async function readUpload(filePath: string): Promise<{ filePath: string; blob: B
     throw new Error(`Upload failed: ${filePath} exceeds the maximum allowed size of 50MB.`);
   }
 
+  // Name and MIME type come from the path the caller asked for; the bytes come
+  // from the real path that was actually vetted.
   const type = mimeTypeFor(filePath);
   // An `openAsBlob` part is lazy: the bytes are pulled during `fetch`, so the
   // file has to stay put until the request goes out.
-  if (openAsBlob) return { filePath, blob: await openAsBlob(filePath, { type }) };
-  const data = await readFile(filePath);
+  if (openAsBlob) return { filePath, blob: await openAsBlob(realPath, { type }) };
+  const data = await readFile(realPath);
   return { filePath, blob: new Blob([new Uint8Array(data)], { type }) };
 }
 
-async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
+async function buildMultipart(
+  config: Config,
+  tool: MealieTool,
+  body: Record<string, unknown>,
+): Promise<FormData> {
   const form = new FormData();
   const fileFields = new Set(tool.body?.fileFields ?? []);
+  // An empty allowlist means "unrestricted", matching every release before this
+  // one. `undefined` below is that unrestricted case — distinct from an empty
+  // array, which would refuse everything.
+  const allowedDirs = config.allowedUploadDirs.length
+    ? await resolveAllowedDirs(config.allowedUploadDirs)
+    : undefined;
+
   for (const [key, value] of Object.entries(body)) {
     if (value === undefined || value === null) continue;
     if (fileFields.has(key)) {
       const paths = Array.isArray(value) ? value : [value];
-      const files = await Promise.all(paths.map((p) => readUpload(String(p))));
+      const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
       for (const { filePath, blob } of files) {
         form.append(key, blob, basename(filePath));
       }
@@ -238,7 +289,7 @@ export async function executeTool(
       }
       payload = params;
     } else {
-      payload = await buildMultipart(tool, bodyValue);
+      payload = await buildMultipart(config, tool, bodyValue);
     }
   }
 

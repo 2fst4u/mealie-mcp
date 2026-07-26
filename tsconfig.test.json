@@ -1,0 +1,12 @@
+// Type-checks the tests alongside the sources. The build config deliberately
+// scopes rootDir/include to src/, so without this the test fixtures drift from
+// the interfaces they stand in for — a Config literal missing a newly added
+// field only failed once the suite actually ran.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

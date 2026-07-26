@@ -18,6 +18,7 @@ const dummyConfig: Config = {
   toolNameMax: 50,
   debug: false,
   retries: 0,
+  allowedUploadDirs: [],
 };
 
 const dummyAuth: TokenProvider = {
@@ -251,6 +252,108 @@ test("rejects an upload path that is not a regular file", async () => {
     () => executeTool(dummyConfig, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
     /is not a regular file/,
   );
+});
+
+// MEALIE_ALLOWED_UPLOAD_DIRS — opt-in allowlist for multipart uploads.
+
+/** Builds `<root>/inside/ok.png` plus an out-of-bounds `<root>/outside/secret.png`. */
+async function withUploadSandbox(
+  fn: (paths: { allowed: string; inside: string; outside: string }) => Promise<void>,
+): Promise<void> {
+  // realpath the root: on macOS os.tmpdir() is itself a symlink (/var -> /private/var),
+  // so a test asserting on real paths has to start from the resolved one.
+  const root = await fs.realpath(await fs.mkdtemp(join(tmpdir(), "mealie-mcp-sandbox-")));
+  const allowed = join(root, "inside");
+  await fs.mkdir(allowed);
+  await fs.mkdir(join(root, "outside"));
+  const inside = join(allowed, "ok.png");
+  const outside = join(root, "outside", "secret.png");
+  await fs.writeFile(inside, "allowed bytes");
+  await fs.writeFile(outside, "SENSITIVE");
+  try {
+    await fn({ allowed, inside, outside });
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+}
+
+test("an empty allowlist leaves uploads unrestricted", async () => {
+  const form = captureFormData();
+  await withUploadSandbox(async ({ outside }) => {
+    await executeTool(dummyConfig, uploadTool, { body: { image: outside } }, dummyAuth);
+    assert.equal(await (form().get("image") as File).text(), "SENSITIVE");
+  });
+});
+
+test("allows an upload inside an allowed directory", async () => {
+  const form = captureFormData();
+  await withUploadSandbox(async ({ allowed, inside }) => {
+    const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    await executeTool(config, uploadTool, { body: { image: inside } }, dummyAuth);
+    assert.equal(await (form().get("image") as File).text(), "allowed bytes");
+  });
+});
+
+test("refuses an upload outside every allowed directory", async () => {
+  await withUploadSandbox(async ({ allowed, outside }) => {
+    const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    await assert.rejects(
+      () => executeTool(config, uploadTool, { body: { image: outside } }, dummyAuth),
+      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+    );
+  });
+});
+
+test("refuses a symlink that escapes an allowed directory", async () => {
+  // The bypass a lexical resolve() misses: the link sits inside the allowlist,
+  // so the path passes a string check, but stat/read follow it straight out.
+  await withUploadSandbox(async ({ allowed, outside }) => {
+    const link = join(allowed, "innocent.png");
+    await fs.symlink(outside, link);
+    const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    await assert.rejects(
+      () => executeTool(config, uploadTool, { body: { image: link } }, dummyAuth),
+      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+    );
+  });
+});
+
+test("does not treat a sibling directory sharing a name prefix as allowed", async () => {
+  await withUploadSandbox(async ({ allowed }) => {
+    const sibling = `${allowed}-evil`;
+    await fs.mkdir(sibling);
+    const sneaky = join(sibling, "x.png");
+    await fs.writeFile(sneaky, "nope");
+    const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    await assert.rejects(
+      () => executeTool(config, uploadTool, { body: { image: sneaky } }, dummyAuth),
+      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+    );
+  });
+});
+
+test("refuses everything when no configured allowed directory resolves", async () => {
+  // A typo'd allowlist must fail closed, never fall back to unrestricted.
+  await withUploadSandbox(async ({ inside }) => {
+    const config = { ...dummyConfig, allowedUploadDirs: ["/definitely/not/a/real/dir"] };
+    await assert.rejects(
+      () => executeTool(config, uploadTool, { body: { image: inside } }, dummyAuth),
+      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+    );
+  });
+});
+
+test("follows a symlinked allowed directory to its real location", async () => {
+  // The mirror case: the allowlist entry itself is a symlink. Resolving only
+  // the file and not the allowlist would refuse a legitimate upload.
+  const form = captureFormData();
+  await withUploadSandbox(async ({ allowed, inside }) => {
+    const linkedDir = `${allowed}-link`;
+    await fs.symlink(allowed, linkedDir);
+    const config = { ...dummyConfig, allowedUploadDirs: [linkedDir] };
+    await executeTool(config, uploadTool, { body: { image: inside } }, dummyAuth);
+    assert.equal(await (form().get("image") as File).text(), "allowed bytes");
+  });
 });
 
 test("handles 204 No Content response", async () => {

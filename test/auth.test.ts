@@ -2,21 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createTokenProvider, isRefreshable } from "../src/auth.js";
 import type { Config } from "../src/config.js";
+import { makeConfig } from "./helpers.js";
 
-function baseConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    baseUrl: "https://mealie.example.com",
-    useBundledSpec: false,
-    readOnly: false,
-    include: [],
-    exclude: [],
-    timeoutMs: 60_000,
-    ...overrides,
-  };
-}
 
 const oauthConfig = (overrides: Partial<Config> = {}): Config =>
-  baseConfig({
+  makeConfig({
     oauth: {
       tokenUrl: "https://idp.example.com/token",
       clientId: "id",
@@ -166,7 +156,7 @@ test("OAuth provider surfaces a clear error when fetch rejects (e.g., network er
 test("static provider returns the bearer token and never fetches", async () => {
   const fetchStub = stubFetch([{ body: {} }]);
   try {
-    const provider = createTokenProvider(baseConfig({ token: "static" }));
+    const provider = createTokenProvider(makeConfig({ token: "static" }));
     assert.equal(await provider.authHeader(true), "Bearer static");
     assert.equal(fetchStub.calls.length, 0);
   } finally {
@@ -175,12 +165,12 @@ test("static provider returns the bearer token and never fetches", async () => {
 });
 
 test("anonymous provider returns undefined", async () => {
-  const provider = createTokenProvider(baseConfig());
+  const provider = createTokenProvider(makeConfig());
   assert.equal(await provider.authHeader(), undefined);
 });
 
 test("isRefreshable is true only for OAuth", () => {
   assert.equal(isRefreshable(oauthConfig()), true);
-  assert.equal(isRefreshable(baseConfig({ token: "static" })), false);
-  assert.equal(isRefreshable(baseConfig()), false);
+  assert.equal(isRefreshable(makeConfig({ token: "static" })), false);
+  assert.equal(isRefreshable(makeConfig()), false);
 });

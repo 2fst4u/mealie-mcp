@@ -27,3 +27,15 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Prototype pollution in deep clone function when iterating over object keys without filtering dangerous keys.
 **Learning:** The `clone` function iterates over all properties (including `__proto__`, `constructor`, and `prototype`) leading to prototype pollution when deeply cloning an object parsed from user input.
 **Prevention:** Add a guard to skip keys: `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;` when deeply cloning objects via `for...in`.
+
+## 2026-07-26 - Upload path allowlist: a lexical path check is not a boundary
+**Vulnerability:** Multipart upload tools take a local path chosen by the model, so a prompt-injection payload in untrusted recipe text can ask for `~/.ssh/id_rsa` instead of a photo. `MEALIE_ALLOWED_UPLOAD_DIRS` now bounds which directories uploads may read from.
+
+**Learning:** The obvious implementation is wrong in a way that looks right. `path.resolve()` is purely lexical — it normalizes `..` and makes the path absolute, but it does not follow symlinks, while `stat`/`readFile`/`openAsBlob` all do. So a symlink *inside* an allowed directory pointing anywhere on the box passes a `resolve()`-plus-`startsWith()` check and is then read in full. A first version of this control shipped exactly that and was demonstrably bypassed by `ln -s /etc/passwd allowed/innocent.png`. Checking one path and reading another is the bug; they must be the same path.
+
+**Prevention:**
+- Resolve with `fs.promises.realpath()`, not `path.resolve()`, and then **read from the realpath you validated** — never re-open the caller's original string, or a swap between check and read reopens the hole.
+- Realpath the allowlist entries too, or a legitimately symlinked allowed directory is refused.
+- Compare with a trailing `path.sep` on both sides (`(real + sep).startsWith(dir + sep)`), otherwise `/srv/uploads-evil` satisfies an allowlist of `/srv/uploads`.
+- Fail closed. If the allowlist is configured but no entry resolves, refuse everything; a typo must never silently widen the boundary back to unrestricted.
+- Test the bypass, not just the happy path. A test that only checks "file in allowed dir works, file in other dir fails" passes against the vulnerable implementation.

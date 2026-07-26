@@ -106,11 +106,42 @@ All configuration is via environment variables.
 | `MEALIE_RETRIES` | – | `2` | Extra attempts for idempotent (`GET`) requests that hit a network error or a retryable status (`429`/`5xx`), with exponential backoff (clamped to 0–5). Non-`GET` methods are never retried automatically. Set `0` to disable. |
 | `MEALIE_DEBUG` | – | `false` | When `true`, log each outgoing request (method, path, response status) to stderr. Useful for troubleshooting from your MCP client. |
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
+| `MEALIE_ALLOWED_UPLOAD_DIRS` | – | — | Comma-separated directories that file uploads may read from. Unset (the default) means any readable path is allowed. See [Restricting file uploads](#restricting-file-uploads). |
 
 > **Note:** Only path and query parameters are exposed as tool inputs. The few Mealie
 > endpoints that read a custom request header or cookie are not driven through those
 > parameters — `Accept-Language` is forwarded via `MEALIE_ACCEPT_LANGUAGE`, and
 > authentication is handled globally.
+
+### Restricting file uploads
+
+A handful of Mealie endpoints take a file — recipe images, recipe assets, ZIP
+imports, backups. For those, the tool argument is a path on the machine running
+this server, and the server reads that path and sends the bytes to Mealie.
+
+That means anything the server process can read, a tool call can upload. Since
+the tool call is chosen by a model, and models read recipe pages and other
+untrusted text, a prompt-injection payload can in principle ask for a path you
+never intended — `~/.ssh/id_rsa` rather than a photo of dinner.
+
+`MEALIE_ALLOWED_UPLOAD_DIRS` bounds that. Set it to a comma-separated list of
+directories, and any upload resolving outside all of them is refused:
+
+```bash
+MEALIE_ALLOWED_UPLOAD_DIRS="/home/me/Pictures/recipes,/srv/mealie/imports"
+```
+
+Paths are compared after symlinks are resolved on both sides, so a symlink
+inside an allowed directory cannot point out of it, a symlinked allowed
+directory still works, and `/srv/mealie/imports-scratch` is not treated as
+being inside `/srv/mealie/imports`. If the variable is set but none of its
+directories exist, every upload is refused rather than silently falling back to
+unrestricted.
+
+Leaving it unset keeps the previous behaviour — any readable path is allowed.
+If you use upload tools at all, setting it is worthwhile; if you never upload
+files, consider dropping those tools entirely with `MEALIE_EXCLUDE_TOOLS`, or
+run the server read-only with `MEALIE_READ_ONLY=true`.
 
 ### Authenticating with OAuth (client credentials)
 
