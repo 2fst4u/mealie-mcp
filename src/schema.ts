@@ -22,9 +22,11 @@ function clone<T>(value: T): T {
     return arr as unknown as T;
   }
   const res = {} as T;
-  for (const k in value) {
+  const keys = Object.keys(value);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
     if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
-    res[k] = clone(value[k]);
+    res[k as keyof T] = clone(value[k as keyof T]);
   }
   return res;
 }
