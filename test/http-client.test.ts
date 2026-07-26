@@ -1,6 +1,8 @@
 import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { executeTool } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
@@ -153,6 +155,102 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(blob instanceof Blob);
   const text = await blob.text();
   assert.ok(text.includes('"name": "mealie-mcp"'));
+});
+
+const uploadTool: MealieTool = {
+  name: "test_tool",
+  description: "",
+  inputSchema: { type: "object" },
+  category: "test",
+  method: "put",
+  path: "/api/recipes/upload",
+  pathParams: [],
+  queryParams: [],
+  body: { kind: "multipart", required: true, fileFields: ["image"] },
+  deprecated: false,
+};
+
+function captureFormData(): () => FormData {
+  let captured: unknown;
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
+    captured = init?.body;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  });
+  return () => {
+    assert.ok(captured instanceof FormData);
+    return captured;
+  };
+}
+
+async function withTempFile<T>(name: string, contents: string, fn: (path: string) => Promise<T>): Promise<T> {
+  const dir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-"));
+  const filePath = join(dir, name);
+  await fs.writeFile(filePath, contents);
+  try {
+    return await fn(filePath);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+test("labels upload parts with a MIME type derived from the extension", async () => {
+  const form = captureFormData();
+
+  await withTempFile("photo.png", "not really a png", async (filePath) => {
+    await executeTool(dummyConfig, uploadTool, { body: { image: filePath } }, dummyAuth);
+  });
+
+  const part = form().get("image") as File;
+  assert.equal(part.type, "image/png");
+  assert.equal(part.name, "photo.png");
+});
+
+test("falls back to octet-stream for unknown extensions", async () => {
+  const form = captureFormData();
+
+  await withTempFile("backup.sqlite", "data", async (filePath) => {
+    await executeTool(dummyConfig, uploadTool, { body: { image: filePath } }, dummyAuth);
+  });
+
+  assert.equal((form().get("image") as File).type, "application/octet-stream");
+});
+
+test("uploads every file when a file field holds an array of paths", async () => {
+  const tool: MealieTool = { ...uploadTool, body: { kind: "multipart", required: true, fileFields: ["images"] } };
+  const form = captureFormData();
+
+  // The parts are inspected inside the temp-file scope on purpose: an
+  // `openAsBlob` part streams off disk when the request is sent, so its
+  // contents only resolve while the backing file still exists.
+  await withTempFile("a.jpg", "first", async (first) =>
+    withTempFile("b.webp", "second", async (second) => {
+      await executeTool(dummyConfig, tool, { body: { images: [first, second] } }, dummyAuth);
+
+      const parts = form().getAll("images") as File[];
+      assert.deepEqual(
+        parts.map((p) => [p.name, p.type]),
+        [
+          ["a.jpg", "image/jpeg"],
+          ["b.webp", "image/webp"],
+        ],
+      );
+      assert.deepEqual(await Promise.all(parts.map((p) => p.text())), ["first", "second"]);
+    }),
+  );
+});
+
+test("reports an unreadable upload path instead of a bare filesystem error", async () => {
+  await assert.rejects(
+    () => executeTool(dummyConfig, uploadTool, { body: { image: "/definitely/not/here.png" } }, dummyAuth),
+    /Upload failed: cannot read \/definitely\/not\/here\.png/,
+  );
+});
+
+test("rejects an upload path that is not a regular file", async () => {
+  await assert.rejects(
+    () => executeTool(dummyConfig, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
+    /is not a regular file/,
+  );
 });
 
 test("handles 204 No Content response", async () => {

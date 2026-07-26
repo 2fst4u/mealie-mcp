@@ -1,7 +1,6 @@
-import { stat, readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import * as fs from "node:fs";
-const openAsBlob = typeof (fs as any).openAsBlob === "function" ? (fs as any).openAsBlob : undefined;
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -23,6 +22,51 @@ const MAX_TEXT = 100_000;
 // them just wastes time.
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const RETRY_BASE_DELAY_MS = 250;
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+// `fs.openAsBlob` hands `fetch` a file-backed Blob it can stream straight off
+// disk, so a 50MB upload never lands in the V8 heap. It arrived in Node 19.8
+// and `engines` still allows 18, where we fall back to buffering the bytes.
+// It has to be read off the namespace rather than imported by name: a static
+// named import of a missing builtin export is a link-time SyntaxError, which
+// would take down the whole server on Node 18 instead of just this one path.
+const openAsBlob: typeof fs.openAsBlob | undefined =
+  typeof fs.openAsBlob === "function" ? fs.openAsBlob : undefined;
+
+// Every part used to go out as a typeless Blob, which multipart serializes as
+// `application/octet-stream` — so an uploaded JPEG announced itself as opaque
+// bytes. Server-side handlers that branch on the part's content type (image
+// uploads, the recipe-from-image endpoints that hand the file to an AI
+// provider) have nothing useful to branch on. Cover the formats Mealie's
+// upload endpoints accept; anything else keeps the octet-stream default.
+const MIME_TYPES = new Map<string, string>([
+  [".avif", "image/avif"],
+  [".bmp", "image/bmp"],
+  [".gif", "image/gif"],
+  [".heic", "image/heic"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".tif", "image/tiff"],
+  [".tiff", "image/tiff"],
+  [".webp", "image/webp"],
+  [".csv", "text/csv"],
+  [".html", "text/html"],
+  [".json", "application/json"],
+  [".md", "text/markdown"],
+  [".pdf", "application/pdf"],
+  [".txt", "text/plain"],
+  [".xml", "application/xml"],
+  [".yaml", "application/yaml"],
+  [".yml", "application/yaml"],
+  [".zip", "application/zip"],
+]);
+
+function mimeTypeFor(filePath: string): string {
+  return MIME_TYPES.get(extname(filePath).toLowerCase()) ?? "application/octet-stream";
+}
 
 function text(value: string): ContentBlock {
   return { type: "text", text: value };
@@ -77,6 +121,32 @@ function scalar(value: unknown): string {
   return String(value);
 }
 
+async function readUpload(filePath: string): Promise<{ filePath: string; blob: Blob }> {
+  // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
+  let stats;
+  try {
+    stats = await stat(filePath);
+  } catch (err) {
+    // Paths here come from a model, so a bare ENOENT/EACCES is worth restating
+    // in terms of the upload it broke.
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`Upload failed: cannot read ${filePath} (${reason}).`);
+  }
+  if (!stats.isFile()) {
+    throw new Error(`Upload failed: ${filePath} is not a regular file.`);
+  }
+  if (stats.size > MAX_FILE_SIZE) {
+    throw new Error(`Upload failed: ${filePath} exceeds the maximum allowed size of 50MB.`);
+  }
+
+  const type = mimeTypeFor(filePath);
+  // An `openAsBlob` part is lazy: the bytes are pulled during `fetch`, so the
+  // file has to stay put until the request goes out.
+  if (openAsBlob) return { filePath, blob: await openAsBlob(filePath, { type }) };
+  const data = await readFile(filePath);
+  return { filePath, blob: new Blob([new Uint8Array(data)], { type }) };
+}
+
 async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
   const form = new FormData();
   const fileFields = new Set(tool.body?.fileFields ?? []);
@@ -84,29 +154,9 @@ async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): 
     if (value === undefined || value === null) continue;
     if (fileFields.has(key)) {
       const paths = Array.isArray(value) ? value : [value];
-      const filePromises = paths.map(async (p) => {
-        const filePath = String(p);
-        // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
-        const stats = await stat(filePath);
-        if (!stats.isFile()) {
-          throw new Error(`Upload failed: ${filePath} is not a regular file.`);
-        }
-        const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-        if (stats.size > MAX_FILE_SIZE) {
-          throw new Error(`Upload failed: ${filePath} exceeds the maximum allowed size of 50MB.`);
-        }
-        if (openAsBlob) {
-          const blob = await openAsBlob(filePath);
-          return { filePath, blob };
-        } else {
-          const data = await readFile(filePath);
-          const blob = new Blob([new Uint8Array(data)]);
-          return { filePath, blob };
-        }
-      });
-      const files = await Promise.all(filePromises);
+      const files = await Promise.all(paths.map((p) => readUpload(String(p))));
       for (const { filePath, blob } of files) {
-        form.append(key, blob as unknown as Blob, basename(filePath));
+        form.append(key, blob, basename(filePath));
       }
     } else if (Array.isArray(value)) {
       for (const item of value) form.append(key, scalar(item));

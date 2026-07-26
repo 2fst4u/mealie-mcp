@@ -9,11 +9,18 @@ const __dirname = dirname(__filename);
 const entrypoint = join(__dirname, "..", "src", "index.ts");
 
 function runIndex(envOverrides: Record<string, string>): { stdout: string; stderr: string; status: number | null } {
+  // Inherit the ambient environment for PATH and friends, but drop every
+  // MEALIE_* var first. Anyone who actually runs this server has MEALIE_API_TOKEN
+  // (or MEALIE_TOOLS, or the OAuth trio) exported, and inheriting those makes
+  // the child pick up real credentials — the "no credentials set" assertion
+  // below fails on a developer machine while passing in clean CI.
+  const env: Record<string, string | undefined> = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("MEALIE_")) delete env[key];
+  }
+
   const result = spawnSync("node", ["--import", "tsx", entrypoint], {
-    env: {
-      ...process.env,
-      ...envOverrides,
-    },
+    env: { ...env, ...envOverrides },
     encoding: "utf8",
     input: "", // sends EOF to stdin
   });
