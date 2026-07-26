@@ -24,12 +24,6 @@
 ## 2025-02-28 - Skip Expensive JSON Pretty-Printing for Truncated Payloads
 **Learning:** Formatting very large JSON payloads using `JSON.stringify(JSON.parse(raw), null, 2)` causes significant CPU and memory overhead. If the formatted output is ultimately going to be truncated down to a fixed maximum length (e.g. 100,000 characters), executing this formatting over megabytes of JSON is a waste of resources. Our benchmarks showed skipping parsing when `raw.length` far exceeds the truncate limit drops processing time from over 100ms to 0ms for large payloads.
 **Action:** When pretty-printing or formatting strings that will later be heavily truncated, check if the raw string size implies it will exceed the limit anyway. If it does (e.g., `raw.length > MAX_TEXT * 5`), bypass the expensive formatting and return the truncated raw string instead.
-## 2026-07-21 - Optimize array cloning with native map\n\n**Learning:** Native `Array.prototype.map()` is generally more optimized by modern JavaScript JIT compilers (like V8) than manual  loops that pre-allocate arrays, especially for large, highly-nested structures, due to better internal memory management for array creation and iteration. Replacing manual loops with `map` improved performance by 10-15% on deep cloning of arrays.\n\n**Action:** Replaced manual `for` loop in `src/schema.ts`'s `clone` function with `value.map(v => clone(v))`.
-## 2026-07-21 - Optimize array cloning with native map
-
-**Learning:** Native Array.prototype.map() is generally more optimized by modern JavaScript JIT compilers (like V8) than manual for loops that pre-allocate arrays, especially for large, highly-nested structures, due to better internal memory management for array creation and iteration. Replacing manual loops with map improved performance by 10-15% on deep cloning of arrays.
-
-**Action:** Replaced manual for loop in src/schema.ts clone function with value.map(v => clone(v)).
 ## 2025-02-14 - Optimize OpenAPI path iteration in generateTools
 **Learning:** Replaced `Object.entries()` with `for...in` loop to avoid intermediate array allocation when iterating over the large `doc.paths` object.
 **Action:** Changed `for (const [path, item] of Object.entries(doc.paths))` to `for (const path in doc.paths)` and accessed `doc.paths[path]` inside the loop directly in `src/tools.ts`.
@@ -38,9 +32,33 @@
 **Learning:** Chained string and array operations (e.g., `split().filter().join()` or regex equivalents) can cause notable garbage collection and execution time overhead in hot paths due to repeated array allocations and iterations.
 
 **Action:** Replaced chained array methods with a single loop iterating directly over the split result, pushing tokens directly to a result string while tracking state. This avoided intermediate array allocations and resulted in a 3x speedup on targeted benchmarks.
-## 2024-05-24 - Array.prototype.map() performance in deep cloning
-**Learning:** In tight recursive deep clone operations, `Array.prototype.map()` incurs significant overhead due to allocating a callback closure and an iterator on every nested array. When deep cloning complex JSON Schemas (like OpenAPI definitions), this compounding allocation overhead slows down execution noticeably.
-**Action:** Use a fast pre-allocated array (`new Array(len)`) and a standard `for` loop for arrays in critical path recursive functions (like deep object cloning or schema transformation) to avoid unnecessary allocations and boost performance by ~15-20%.
+## 2026-07-26 - STOP re-litigating the array branch of `clone()` in src/schema.ts
+
+This entry replaces three earlier ones that contradicted each other. Two dated
+2026-07-21 (one of them a malformed duplicate) claimed `value.map(v => clone(v))`
+was 10-15% *faster* than a pre-allocated `for` loop. One dated 2024-05-24 claimed
+the pre-allocated `for` loop was 15-20% faster than `map`. Both directions were
+recorded as measured wins, which is how the same three lines got rewritten back
+and forth across several PRs.
+
+**Learning:** Neither claim reproduces. Cloning the repo's own
+`openapi.snapshot.json`, interleaving both implementations within a single
+process so they share JIT and GC state, and taking medians over 30 trials, the
+difference is **-0.3%, +0.9%, +0.7% across three runs — the sign flips, so it is
+noise.** The earlier double-digit numbers almost certainly came from
+benchmarking one implementation per process, where warmup order and GC timing
+dominate a ~16ms measurement.
+
+**Action:** Leave the array branch alone. It uses a pre-allocated `new Array(len)`
+plus an index loop; that is fine and so is `map`, and no future change to this
+branch should be justified on performance grounds without an interleaved,
+multi-trial benchmark showing a consistent sign. More generally: `clone()` runs
+during one-time tool generation at startup, not per request, so even a real 5%
+here is single-digit milliseconds once per process — the same caveat already
+recorded for `collectRefs`/`rewriteRefs` above. Before writing a perf entry,
+interleave the variants in one process, report a median over many trials, and
+re-run the whole benchmark at least twice; if the sign changes, there is no
+effect to record.
 ## 2026-07-23 - Multipart FormData Memory Optimization
 
 **Learning:** When dealing with potentially large file uploads (up to 50MB) via `FormData` in Node.js, using `readFile` causes the entire file to be loaded into memory, leading to increased memory footprint and garbage collection pauses. Node's `fs.openAsBlob` provides a memory-efficient alternative that works seamlessly with `FormData`, allowing the `fetch` implementation to stream the file directly from disk without allocating massive V8 strings/buffers.
