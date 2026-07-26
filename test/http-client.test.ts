@@ -16,6 +16,7 @@ const dummyConfig: Config = {
   toolNameMax: 50,
   debug: false,
   retries: 0,
+  allowedDirs: [process.cwd()],
 };
 
 const dummyAuth: TokenProvider = {
@@ -153,6 +154,50 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(blob instanceof Blob);
   const text = await blob.text();
   assert.ok(text.includes('"name": "mealie-mcp"'));
+});
+
+test("fails if allowedDirs is empty for file upload", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "put",
+    path: "/api/recipes/upload",
+    pathParams: [],
+    queryParams: [],
+    body: { kind: "multipart", required: true, fileFields: ["image"] },
+    deprecated: false,
+  };
+
+  const restrictedConfig = { ...dummyConfig, allowedDirs: [] };
+
+  await assert.rejects(
+    executeTool(restrictedConfig, tool, { body: { title: "My Recipe", image: "package.json" } }, dummyAuth),
+    /File uploads are disabled by default for security/
+  );
+});
+
+test("fails if upload path is outside allowedDirs", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "put",
+    path: "/api/recipes/upload",
+    pathParams: [],
+    queryParams: [],
+    body: { kind: "multipart", required: true, fileFields: ["image"] },
+    deprecated: false,
+  };
+
+  const restrictedConfig = { ...dummyConfig, allowedDirs: ["/some/restricted/dir"] };
+
+  await assert.rejects(
+    executeTool(restrictedConfig, tool, { body: { title: "My Recipe", image: "package.json" } }, dummyAuth),
+    /not within an allowed directory/
+  );
 });
 
 test("handles 204 No Content response", async () => {

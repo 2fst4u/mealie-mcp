@@ -5,7 +5,7 @@ import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 
 test("server CallToolRequestSchema handler catches errors from executeTool", async () => {
-  const config: Config = { baseUrl: "http://example.com" } as any;
+  const config: Config = { baseUrl: "http://example.com", allowedDirs: [] } as any;
   const tools: MealieTool[] = [{
     name: "test_tool",
     description: "A test tool",
@@ -36,7 +36,7 @@ test("server CallToolRequestSchema handler catches errors from executeTool", asy
 });
 
 test("server ListToolsRequestSchema handler returns tools", async () => {
-  const config: Config = { baseUrl: "http://example.com" } as any;
+  const config: Config = { baseUrl: "http://example.com", allowedDirs: [] } as any;
   const tools: MealieTool[] = [{
     name: "test_tool",
     description: "A test tool",
@@ -64,7 +64,7 @@ test("server ListToolsRequestSchema handler returns tools", async () => {
 });
 
 test("server CallToolRequestSchema handler returns error for unknown tool", async () => {
-  const config: Config = { baseUrl: "http://example.com" } as any;
+  const config: Config = { baseUrl: "http://example.com", allowedDirs: [] } as any;
   const tools: MealieTool[] = [];
 
   const server = createServer(config, tools, "1.0.0", {} as any);

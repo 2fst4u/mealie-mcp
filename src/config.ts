@@ -52,6 +52,8 @@ export interface Config {
    * never retried automatically because they may not be safe to repeat.
    */
   retries: number;
+  /** Allowed directories for file uploads. Empty = uploads are disabled. */
+  allowedDirs: string[];
 }
 
 /** Default cap for generated tool names; shared with the tool generator. */
@@ -146,5 +148,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     toolNameMax: parseToolNameMax(env),
     debug: bool(env.MEALIE_DEBUG),
     retries: parseRetries(env),
+    allowedDirs: list(env.MEALIE_ALLOWED_DIRS),
   };
 }

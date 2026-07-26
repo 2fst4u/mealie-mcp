@@ -27,3 +27,7 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Prototype pollution in deep clone function when iterating over object keys without filtering dangerous keys.
 **Learning:** The `clone` function iterates over all properties (including `__proto__`, `constructor`, and `prototype`) leading to prototype pollution when deeply cloning an object parsed from user input.
 **Prevention:** Add a guard to skip keys: `if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;` when deeply cloning objects via `for...in`.
+## 2025-02-23 - Arbitrary Local File Read in Multipart Uploads
+**Vulnerability:** Arbitrary Local File Read in Multipart Uploads via MCP Tool
+**Learning:** File uploads via local MCP servers are disabled by default for security to prevent arbitrary local file reads. To enable them, the `MEALIE_ALLOWED_DIRS` environment variable must be explicitly configured, and file paths must be securely validated using `path.resolve` and `path.sep` to prevent traversal bypasses.
+**Prevention:** When building tools that read local files, restrict paths to an explicit allowlist of safe directories. Use `path.resolve()` on both the input path and the allowed paths, and append `path.sep` to the allowed directory strings to prevent suffix-matching traversal bypasses (e.g. `/secure` vs `/secure-fake/evil.txt`). Reject requests where the target path does not strictly start with the allowed boundary.

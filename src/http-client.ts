@@ -1,5 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, resolve, sep } from "node:path";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -75,15 +75,31 @@ function scalar(value: unknown): string {
   return String(value);
 }
 
-async function buildMultipart(tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
+async function buildMultipart(config: Config, tool: MealieTool, body: Record<string, unknown>): Promise<FormData> {
   const form = new FormData();
   const fileFields = new Set(tool.body?.fileFields ?? []);
+  const allowedDirs = config.allowedDirs.map((dir) => {
+    const resolved = resolve(dir);
+    return resolved.endsWith(sep) ? resolved : resolved + sep;
+  });
+
   for (const [key, value] of Object.entries(body)) {
     if (value === undefined || value === null) continue;
     if (fileFields.has(key)) {
       const paths = Array.isArray(value) ? value : [value];
       const filePromises = paths.map(async (p) => {
         const filePath = String(p);
+        const resolvedPath = resolve(filePath);
+
+        if (allowedDirs.length === 0) {
+          throw new Error("File uploads are disabled by default for security. Set MEALIE_ALLOWED_DIRS to enable.");
+        }
+
+        const isAllowed = allowedDirs.some((dir) => resolvedPath.startsWith(dir) || resolvedPath === dir.slice(0, -1));
+        if (!isAllowed) {
+          throw new Error(`Upload failed: ${filePath} is not within an allowed directory.`);
+        }
+
         // SECURITY: Validate file type and size before reading to prevent DoS (e.g., /dev/urandom or huge files)
         const stats = await stat(filePath);
         if (!stats.isFile()) {
@@ -180,7 +196,7 @@ export async function executeTool(
       }
       payload = params;
     } else {
-      payload = await buildMultipart(tool, bodyValue);
+      payload = await buildMultipart(config, tool, bodyValue);
     }
   }
 
