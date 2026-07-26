@@ -2,22 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadOpenApi } from "../src/openapi-loader.js";
 import type { Config } from "../src/config.js";
+import { makeConfig } from "./helpers.js";
 
-function baseConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    baseUrl: "https://mealie.example.com",
-    useBundledSpec: false,
-    readOnly: false,
-    include: [],
-    exclude: [],
-    timeoutMs: 60_000,
-    ...overrides,
-  };
-}
 
 /** Install a fake global fetch that returns the given token responses in order. */
 function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
-  const calls: Array<{ url: string; signal?: AbortSignal }> = [];
+  const calls: Array<{ url: string; signal?: AbortSignal | null }> = [];
   let i = 0;
   const original = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
@@ -54,7 +44,7 @@ function stubStderr() {
 // Alternatively, we can just check if it contains a paths object.
 
 test("uses the bundled spec directly when useBundledSpec is true", async () => {
-  const result = await loadOpenApi(baseConfig({ useBundledSpec: true }));
+  const result = await loadOpenApi(makeConfig({ useBundledSpec: true }));
   assert.equal(result.source, "bundled");
   assert.ok(result.doc.paths, "should contain paths object");
 });
@@ -63,7 +53,7 @@ test("uses the live spec from ${baseUrl}/openapi.json when the fetch succeeds an
   const liveSpec = { paths: { "/live": {} }, info: { title: "Live" } };
   const fetchStub = stubFetch([{ body: liveSpec }]);
   try {
-    const result = await loadOpenApi(baseConfig());
+    const result = await loadOpenApi(makeConfig());
     assert.equal(result.source, "live");
     assert.deepEqual(result.doc as unknown, liveSpec);
     assert.equal(fetchStub.calls.length, 1);
@@ -77,7 +67,7 @@ test("uses openapiUrl if explicitly provided in the config", async () => {
   const liveSpec = { paths: { "/live": {} } };
   const fetchStub = stubFetch([{ body: liveSpec }]);
   try {
-    const result = await loadOpenApi(baseConfig({ openapiUrl: "https://custom.example.com/spec.json" }));
+    const result = await loadOpenApi(makeConfig({ openapiUrl: "https://custom.example.com/spec.json" }));
     assert.equal(result.source, "live");
     assert.deepEqual(result.doc as unknown, liveSpec);
     assert.equal(fetchStub.calls.length, 1);
@@ -91,7 +81,7 @@ test("gracefully falls back to the bundled spec if fetch returns a non-200 HTTP 
   const fetchStub = stubFetch([{ status: 404, body: "Not Found" }]);
   const stderrStub = stubStderr();
   try {
-    const result = await loadOpenApi(baseConfig());
+    const result = await loadOpenApi(makeConfig());
     assert.equal(result.source, "bundled");
     assert.ok(result.doc.paths, "should contain paths object");
     assert.equal(fetchStub.calls.length, 1);
@@ -108,7 +98,7 @@ test("gracefully falls back to the bundled spec if the fetched JSON is missing a
   const fetchStub = stubFetch([{ body: { info: { title: "Invalid" } } }]);
   const stderrStub = stubStderr();
   try {
-    const result = await loadOpenApi(baseConfig());
+    const result = await loadOpenApi(makeConfig());
     assert.equal(result.source, "bundled");
     assert.ok(result.doc.paths, "should contain paths object");
     assert.equal(fetchStub.calls.length, 1);
@@ -125,7 +115,7 @@ test("gracefully falls back to the bundled spec if the fetch promise rejects (e.
   const fetchStub = stubFetch([{ status: -1, body: "" }]);
   const stderrStub = stubStderr();
   try {
-    const result = await loadOpenApi(baseConfig());
+    const result = await loadOpenApi(makeConfig());
     assert.equal(result.source, "bundled");
     assert.ok(result.doc.paths, "should contain paths object");
     assert.equal(fetchStub.calls.length, 1);
@@ -142,7 +132,7 @@ test("passes an AbortSignal to fetch to enforce the configured timeout", async (
   const liveSpec = { paths: { "/live": {} } };
   const fetchStub = stubFetch([{ body: liveSpec }]);
   try {
-    await loadOpenApi(baseConfig({ timeoutMs: 1234 }));
+    await loadOpenApi(makeConfig({ timeoutMs: 1234 }));
     assert.equal(fetchStub.calls.length, 1);
     const signal = fetchStub.calls[0].signal;
     assert.ok(signal, "fetch should be called with an AbortSignal");

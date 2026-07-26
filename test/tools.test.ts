@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { generateTools, filterTools, DEFAULT_EXCLUDE, HARD_EXCLUDE, type MealieTool } from "../src/tools.js";
 import type { Config } from "../src/config.js";
+import { makeConfig } from "./helpers.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -14,17 +15,6 @@ async function loadSnapshot(): Promise<OpenApiDocument> {
   return JSON.parse(await readFile(snapshotPath, "utf8")) as OpenApiDocument;
 }
 
-function baseConfig(overrides: Partial<Config> = {}): Config {
-  return {
-    baseUrl: "https://mealie.example.com",
-    useBundledSpec: false,
-    readOnly: false,
-    include: [],
-    exclude: [],
-    timeoutMs: 60_000,
-    ...overrides,
-  };
-}
 
 /** Collect every $ref string anywhere within a JSON value. */
 function collectRefs(node: unknown, out: string[]): void {
@@ -133,7 +123,7 @@ test("path params are required in the input schema", async () => {
 test("readOnly filter keeps only GET tools", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
-  const filtered = filterTools(tools, baseConfig({ readOnly: true }));
+  const filtered = filterTools(tools, makeConfig({ readOnly: true }));
   assert.ok(filtered.length > 0);
   assert.ok(filtered.every((t) => t.method === "get"));
 });
@@ -142,23 +132,23 @@ test("include filter matches by category prefix and exact name", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
 
-  const byCategory = filterTools(tools, baseConfig({ include: ["recipe_crud"] }));
+  const byCategory = filterTools(tools, makeConfig({ include: ["recipe_crud"] }));
   assert.ok(byCategory.length > 0);
   assert.ok(byCategory.every((t) => t.category === "recipe_crud"));
 
-  const byPrefix = filterTools(tools, baseConfig({ include: ["households"] }));
+  const byPrefix = filterTools(tools, makeConfig({ include: ["households"] }));
   assert.ok(byPrefix.length > 0);
   assert.ok(byPrefix.every((t) => t.category.startsWith("households")));
 
   const exactName = byCategory[0].name;
-  const single = filterTools(tools, baseConfig({ include: [exactName] }));
+  const single = filterTools(tools, makeConfig({ include: [exactName] }));
   assert.ok(single.some((t) => t.name === exactName));
 });
 
 test("exclude filter removes matching tools", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
-  const filtered = filterTools(tools, baseConfig({ exclude: ["admin"] }));
+  const filtered = filterTools(tools, makeConfig({ exclude: ["admin"] }));
   assert.ok(filtered.every((t) => !t.category.startsWith("admin")));
   assert.ok(filtered.length < tools.length);
 });
@@ -166,7 +156,7 @@ test("exclude filter removes matching tools", async () => {
 test("hard baseline always drops the default-exclude list and admin endpoints", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
-  const trimmed = filterTools(tools, baseConfig());
+  const trimmed = filterTools(tools, makeConfig());
 
   assert.ok(trimmed.length < tools.length, "expected fewer tools after trimming");
   // Admin categories are never exposed.
@@ -186,7 +176,7 @@ test("hard-excluded tools cannot be re-enabled via MEALIE_TOOLS include", async 
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
   // Even explicitly allow-listing admin + a junk endpoint must not bring them back.
-  const filtered = filterTools(tools, baseConfig({ include: ["admin", "download_file"] }));
+  const filtered = filterTools(tools, makeConfig({ include: ["admin", "download_file"] }));
   assert.ok(!filtered.some((t) => t.category.startsWith("admin")), "admin must stay excluded");
   assert.ok(!filtered.some((t) => t.name === "download_file"), "junk endpoint must stay excluded");
 });

@@ -115,3 +115,14 @@ test("parses and clamps retries", () => {
   const bad = loadConfig({ MEALIE_BASE_URL: "https://x", MEALIE_RETRIES: "abc" } as NodeJS.ProcessEnv);
   assert.equal(bad.retries, 2); // falls back to default
 });
+
+test("parses the upload allowlist and defaults it to unrestricted", () => {
+  const def = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
+  assert.deepEqual(def.allowedUploadDirs, []);
+
+  const set = loadConfig({
+    MEALIE_BASE_URL: "https://x",
+    MEALIE_ALLOWED_UPLOAD_DIRS: " /srv/uploads , /home/me/pics ,",
+  } as NodeJS.ProcessEnv);
+  assert.deepEqual(set.allowedUploadDirs, ["/srv/uploads", "/home/me/pics"]);
+});

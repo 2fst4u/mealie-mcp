@@ -52,6 +52,13 @@ export interface Config {
    * never retried automatically because they may not be safe to repeat.
    */
   retries: number;
+  /**
+   * Directories that multipart file uploads may read from. Empty (the default)
+   * means no restriction, preserving the behaviour of every release before this
+   * one. Setting it opts into an allowlist: an upload whose real path — after
+   * symlinks are resolved — falls outside every entry is refused.
+   */
+  allowedUploadDirs: string[];
 }
 
 /** Default cap for generated tool names; shared with the tool generator. */
@@ -146,5 +153,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     toolNameMax: parseToolNameMax(env),
     debug: bool(env.MEALIE_DEBUG),
     retries: parseRetries(env),
+    allowedUploadDirs: list(env.MEALIE_ALLOWED_UPLOAD_DIRS),
   };
 }

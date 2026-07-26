@@ -13,7 +13,9 @@ test("server CallToolRequestSchema handler catches errors from executeTool", asy
     path: "/api/test/{id}",
     pathParams: ["id"],
     queryParams: [],
-    inputSchema: { type: "object" }
+    inputSchema: { type: "object" },
+    category: "test",
+    deprecated: false
   }];
 
   const server = createServer(config, tools, "1.0.0", {} as any);
@@ -44,7 +46,9 @@ test("server ListToolsRequestSchema handler returns tools", async () => {
     path: "/api/test",
     pathParams: [],
     queryParams: [],
-    inputSchema: { type: "object", properties: { a: { type: "string" } } }
+    inputSchema: { type: "object", properties: { a: { type: "string" } } },
+    category: "test",
+    deprecated: false
   }];
 
   const server = createServer(config, tools, "1.0.0", {} as any);
