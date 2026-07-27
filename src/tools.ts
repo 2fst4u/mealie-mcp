@@ -380,7 +380,7 @@ export const DEFAULT_EXCLUDE: string[] = [
  * what a recipe assistant needs, and a security footgun, so they are never
  * exposed. Matches every `Admin: *` category slug.
  */
-export const ADMIN_EXCLUDE: string[] = ["admin"];
+const ADMIN_EXCLUDE: string[] = ["admin"];
 
 /**
  * Tools that are *never* exposed, regardless of user config. This is the safe
