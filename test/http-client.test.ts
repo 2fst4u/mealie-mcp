@@ -148,7 +148,7 @@ test("sends multipart body and reads local files", async () => {
   });
 
   // Use a real file that exists in the repo to avoid ESM named-import mocking issues
-  await executeTool(dummyConfig, tool, { body: { title: "My Recipe", image: "package.json" } }, dummyAuth);
+  await executeTool({ ...dummyConfig, allowedUploadDirs: [process.cwd()] }, tool, { body: { title: "My Recipe", image: "package.json" } }, dummyAuth);
 
   assert.ok(capturedBody instanceof FormData);
   assert.equal(capturedBody.get("title"), "My Recipe");
@@ -198,7 +198,7 @@ test("labels upload parts with a MIME type derived from the extension", async ()
   const form = captureFormData();
 
   await withTempFile("photo.png", "not really a png", async (filePath) => {
-    await executeTool(dummyConfig, uploadTool, { body: { image: filePath } }, dummyAuth);
+    await executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, uploadTool, { body: { image: filePath } }, dummyAuth);
   });
 
   const part = form().get("image") as File;
@@ -210,7 +210,7 @@ test("falls back to octet-stream for unknown extensions", async () => {
   const form = captureFormData();
 
   await withTempFile("backup.sqlite", "data", async (filePath) => {
-    await executeTool(dummyConfig, uploadTool, { body: { image: filePath } }, dummyAuth);
+    await executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, uploadTool, { body: { image: filePath } }, dummyAuth);
   });
 
   assert.equal((form().get("image") as File).type, "application/octet-stream");
@@ -225,7 +225,7 @@ test("uploads every file when a file field holds an array of paths", async () =>
   // contents only resolve while the backing file still exists.
   await withTempFile("a.jpg", "first", async (first) =>
     withTempFile("b.webp", "second", async (second) => {
-      await executeTool(dummyConfig, tool, { body: { images: [first, second] } }, dummyAuth);
+      await executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, tool, { body: { images: [first, second] } }, dummyAuth);
 
       const parts = form().getAll("images") as File[];
       assert.deepEqual(
@@ -249,7 +249,7 @@ test("reports an unreadable upload path instead of a bare filesystem error", asy
 
 test("rejects an upload path that is not a regular file", async () => {
   await assert.rejects(
-    () => executeTool(dummyConfig, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
+    () => executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
     /is not a regular file/,
   );
 });
@@ -277,11 +277,13 @@ async function withUploadSandbox(
   }
 }
 
-test("an empty allowlist leaves uploads unrestricted", async () => {
-  const form = captureFormData();
+test("an empty allowlist refuses uploads (fails closed)", async () => {
   await withUploadSandbox(async ({ outside }) => {
-    await executeTool(dummyConfig, uploadTool, { body: { image: outside } }, dummyAuth);
-    assert.equal(await (form().get("image") as File).text(), "SENSITIVE");
+    // dummyConfig has allowedUploadDirs: []
+    await assert.rejects(
+      () => executeTool(dummyConfig, uploadTool, { body: { image: outside } }, dummyAuth),
+      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+    );
   });
 });
 
