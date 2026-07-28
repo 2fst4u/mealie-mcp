@@ -39,3 +39,8 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 - Compare with a trailing `path.sep` on both sides (`(real + sep).startsWith(dir + sep)`), otherwise `/srv/uploads-evil` satisfies an allowlist of `/srv/uploads`.
 - Fail closed. If the allowlist is configured but no entry resolves, refuse everything; a typo must never silently widen the boundary back to unrestricted.
 - Test the bypass, not just the happy path. A test that only checks "file in allowed dir works, file in other dir fails" passes against the vulnerable implementation.
+
+## 2024-05-24 - Secure by Default Local File Uploads
+**Vulnerability:** Arbitrary local file read through MCP tools when upload directories are not configured (unrestricted by default).
+**Learning:** Defaulting configurations to 'unrestricted' when empty allows for accidental exposure of local filesystem out-of-the-box, increasing risk of Local File Inclusion / Arbitrary File Read.
+**Prevention:** Always 'fail closed'. By default, sensitive features like local filesystem access should be disabled (refuse all) until explicitly enabled via a strictly-configured allowlist.

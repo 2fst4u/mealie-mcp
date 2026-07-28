@@ -116,7 +116,7 @@ test("parses and clamps retries", () => {
   assert.equal(bad.retries, 2); // falls back to default
 });
 
-test("parses the upload allowlist and defaults it to unrestricted", () => {
+test("parses the upload allowlist and defaults to empty", () => {
   const def = loadConfig({ MEALIE_BASE_URL: "https://x" } as NodeJS.ProcessEnv);
   assert.deepEqual(def.allowedUploadDirs, []);
 

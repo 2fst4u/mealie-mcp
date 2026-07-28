@@ -144,7 +144,7 @@ async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
 
 async function readUpload(
   filePath: string,
-  allowedDirs: string[] | undefined,
+  allowedDirs: string[],
 ): Promise<{ filePath: string; blob: Blob }> {
   // SECURITY: the path comes from the model, so resolve symlinks before doing
   // anything else and then use only the real path. Checking the path as given
@@ -160,7 +160,7 @@ async function readUpload(
     throw new Error(`Upload failed: cannot read ${filePath} (${reason}).`);
   }
 
-  if (allowedDirs && !allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {
+  if (!allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {
     // Deliberately reports the real path: when a symlink is what pushed the
     // upload out of bounds, naming only the link makes the refusal baffling.
     throw new Error(
@@ -194,12 +194,9 @@ async function buildMultipart(
 ): Promise<FormData> {
   const form = new FormData();
   const fileFields = new Set(tool.body?.fileFields ?? []);
-  // An empty allowlist means "unrestricted", matching every release before this
-  // one. `undefined` below is that unrestricted case — distinct from an empty
-  // array, which would refuse everything.
-  const allowedDirs = config.allowedUploadDirs.length
-    ? await resolveAllowedDirs(config.allowedUploadDirs)
-    : undefined;
+  // SECURITY: Fail closed. If no upload directories are explicitly allowed,
+  // uploads are refused to prevent arbitrary local file reads.
+  const allowedDirs = await resolveAllowedDirs(config.allowedUploadDirs);
 
   for (const [key, value] of Object.entries(body)) {
     if (value === undefined || value === null) continue;
