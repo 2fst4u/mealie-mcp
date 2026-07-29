@@ -68,3 +68,7 @@ effect to record.
 **Correction on the measurement:** the ~328ms figure was for *mounting* a 40MB file into `FormData`, which is not the end-to-end win it looks like — the bytes still have to be read during `fetch`, so the read cost is moved rather than removed. The durable benefit is memory: no 40MB `Buffer` in the V8 heap and no GC pressure from it. Benchmark the whole request, not just the `FormData` construction, before quoting a latency number.
 
 **Follow-up:** `openAsBlob` is Node >= 19.8 and `engines` still allows 18, so it has to be feature-detected off the `node:fs` namespace. A static `import { openAsBlob } from "node:fs"` is a link-time `SyntaxError` on a runtime that lacks the export, which fails the entire module rather than the one code path. Feature-detection needs no `any`: `typeof fs.openAsBlob | undefined` types it exactly.
+
+## 2024-07-29 - Precompute static MCP tool lists
+**Learning:** In MCP servers (`@modelcontextprotocol/sdk/server`), returning the tool list in the `ListToolsRequestSchema` handler by dynamically mapping the array of tools (e.g. `tools.map(t => ...)` ) allocates hundreds of new objects on every request. Since the list of exposed tools in `mealie-mcp` is static after startup, this creates unnecessary GC churn and degrades performance for clients that frequently poll.
+**Action:** Always precompute and cache the static tools list response during server initialization instead of dynamically assembling it on every `ListToolsRequest`.
