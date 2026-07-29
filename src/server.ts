@@ -20,13 +20,18 @@ export function createServer(config: Config, tools: MealieTool[], version: strin
     { capabilities: { tools: {} } },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  // ⚡ Bolt: Precompute the tool list response once since the tools array is static
+  // after server creation. This avoids allocating a new array and hundreds of objects
+  // on every ListToolsRequest, reducing GC churn and latency for frequent polling.
+  const cachedListToolsResponse = {
     tools: tools.map((t) => ({
       name: t.name,
       description: t.description,
       inputSchema: t.inputSchema as { type: "object"; [k: string]: unknown },
     })),
-  }));
+  };
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => cachedListToolsResponse);
 
   server.setRequestHandler(CallToolRequestSchema, (request) =>
     handleToolCall(request, config, byName, auth)
