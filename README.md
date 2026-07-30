@@ -106,7 +106,7 @@ All configuration is via environment variables.
 | `MEALIE_RETRIES` | – | `2` | Extra attempts for idempotent (`GET`) requests that hit a network error or a retryable status (`429`/`5xx`), with exponential backoff (clamped to 0–5). Non-`GET` methods are never retried automatically. Set `0` to disable. |
 | `MEALIE_DEBUG` | – | `false` | When `true`, log each outgoing request (method, path, response status) to stderr. Useful for troubleshooting from your MCP client. |
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
-| `MEALIE_ALLOWED_UPLOAD_DIRS` | – | — | Comma-separated directories that file uploads may read from. Unset (the default) means any readable path is allowed. See [Restricting file uploads](#restricting-file-uploads). |
+| `MEALIE_ALLOWED_UPLOAD_DIRS` | – | — | Comma-separated directories that file uploads may read from. Unset (the default) means uploads are disabled. See [Restricting file uploads](#restricting-file-uploads). |
 
 > **Note:** Only path and query parameters are exposed as tool inputs. The few Mealie
 > endpoints that read a custom request header or cookie are not driven through those
@@ -138,10 +138,10 @@ being inside `/srv/mealie/imports`. If the variable is set but none of its
 directories exist, every upload is refused rather than silently falling back to
 unrestricted.
 
-Leaving it unset keeps the previous behaviour — any readable path is allowed.
-If you use upload tools at all, setting it is worthwhile; if you never upload
-files, consider dropping those tools entirely with `MEALIE_EXCLUDE_TOOLS`, or
-run the server read-only with `MEALIE_READ_ONLY=true`.
+Leaving it unset disables all uploads for security. If you use upload tools,
+setting this variable is required. If you never upload files, consider dropping
+those tools entirely with `MEALIE_EXCLUDE_TOOLS`, or run the server read-only
+with `MEALIE_READ_ONLY=true`.
 
 ### Authenticating with OAuth (client credentials)
 
