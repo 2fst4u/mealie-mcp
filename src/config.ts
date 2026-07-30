@@ -54,9 +54,9 @@ export interface Config {
   retries: number;
   /**
    * Directories that multipart file uploads may read from. Empty (the default)
-   * means no restriction, preserving the behaviour of every release before this
-   * one. Setting it opts into an allowlist: an upload whose real path — after
-   * symlinks are resolved — falls outside every entry is refused.
+   * means uploads are disabled for security. Setting it opts into an allowlist:
+   * an upload whose real path — after symlinks are resolved — falls outside
+   * every entry is refused.
    */
   allowedUploadDirs: string[];
 }

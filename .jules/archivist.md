@@ -11,3 +11,7 @@
 **Action:**
 1. Always verify CI trigger claims against the actual `.github/workflows/*.yml` files.
 2. When updating configuration documentation, check the parsing implementation (e.g., `src/config.ts`) to see if constraints claimed in documentation are actually enforced or if the code handles them gracefully. Remove unnecessary constraints to avoid confusing users.
+
+## 2026-07-30 - MEALIE_ALLOWED_UPLOAD_DIRS default behavior drift
+**Learning:** The behavior of MEALIE_ALLOWED_UPLOAD_DIRS changed to fail-closed (uploads disabled when unset) for security, but README.md, .env.example, and config.ts JSDoc were not updated, leading to inaccurate claims.
+**Action:** Update all documentation surfaces to reflect the fail-closed security posture so the correct path is accurately documented.
