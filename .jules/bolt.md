@@ -72,3 +72,6 @@ effect to record.
 ## 2024-07-29 - Precompute static MCP tool lists
 **Learning:** In MCP servers (`@modelcontextprotocol/sdk/server`), returning the tool list in the `ListToolsRequestSchema` handler by dynamically mapping the array of tools (e.g. `tools.map(t => ...)` ) allocates hundreds of new objects on every request. Since the list of exposed tools in `mealie-mcp` is static after startup, this creates unnecessary GC churn and degrades performance for clients that frequently poll.
 **Action:** Always precompute and cache the static tools list response during server initialization instead of dynamically assembling it on every `ListToolsRequest`.
+## 2024-05-24 - Map Initialization Optimization
+**Learning:** Initializing Maps using `new Map(array.map(...))` creates unnecessary intermediate arrays and tuple objects, which can cause significant GC churn and memory overhead.
+**Action:** Replace `new Map(array.map(...))` with a `for...of` loop and `Map.prototype.set()` to populate the Map iteratively.
