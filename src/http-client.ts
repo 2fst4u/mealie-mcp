@@ -215,6 +215,35 @@ async function buildMultipart(
   return form;
 }
 
+async function readImageBody(res: Response, contentType: string): Promise<{ blocks: ContentBlock[]; raw: string }> {
+  const buf = Buffer.from(await res.arrayBuffer());
+  return {
+    blocks: [{ type: "image", data: buf.toString("base64"), mimeType: contentType.split(";")[0] }],
+    raw: `[image ${contentType} ${buf.length} bytes]`,
+  };
+}
+
+async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+  const raw = await res.text();
+  // ⚡ Bolt: Avoid expensive parsing and stringifying if the result is going
+  // to be heavily truncated anyway. MAX_TEXT * 5 is an arbitrary threshold
+  // indicating the raw JSON is already huge (e.g. 500KB+).
+  if (raw.length > MAX_TEXT * 5) {
+    return { blocks: [text(truncate(raw))], raw };
+  }
+  try {
+    const pretty = JSON.stringify(JSON.parse(raw), null, 2);
+    return { blocks: [text(truncate(pretty))], raw };
+  } catch {
+    return { blocks: [text(truncate(raw))], raw };
+  }
+}
+
+async function readTextBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+  const raw = await res.text();
+  return { blocks: [text(truncate(raw))], raw };
+}
+
 async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
   const contentType = res.headers.get("content-type") ?? "";
 
@@ -226,32 +255,15 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   }
 
   if (contentType.startsWith("image/")) {
-    const buf = Buffer.from(await res.arrayBuffer());
-    return {
-      blocks: [{ type: "image", data: buf.toString("base64"), mimeType: contentType.split(";")[0] }],
-      raw: `[image ${contentType} ${buf.length} bytes]`,
-    };
+    return readImageBody(res, contentType);
   }
 
   if (contentType.includes("application/json")) {
-    const raw = await res.text();
-    // ⚡ Bolt: Avoid expensive parsing and stringifying if the result is going
-    // to be heavily truncated anyway. MAX_TEXT * 5 is an arbitrary threshold
-    // indicating the raw JSON is already huge (e.g. 500KB+).
-    if (raw.length > MAX_TEXT * 5) {
-      return { blocks: [text(truncate(raw))], raw };
-    }
-    try {
-      const pretty = JSON.stringify(JSON.parse(raw), null, 2);
-      return { blocks: [text(truncate(pretty))], raw };
-    } catch {
-      return { blocks: [text(truncate(raw))], raw };
-    }
+    return readJsonBody(res);
   }
 
   if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
-    const raw = await res.text();
-    return { blocks: [text(truncate(raw))], raw };
+    return readTextBody(res);
   }
 
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
