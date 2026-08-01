@@ -262,6 +262,57 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   };
 }
 
+async function buildPayload(
+  config: Config,
+  tool: MealieTool,
+  args: Record<string, unknown>,
+  headers: Record<string, string>,
+): Promise<string | URLSearchParams | FormData | undefined> {
+  if (!tool.body || args.body === undefined || args.body === null) {
+    return undefined;
+  }
+
+  const bodyValue = args.body as Record<string, unknown>;
+  if (tool.body.kind === "json") {
+    headers["Content-Type"] = "application/json";
+    return JSON.stringify(bodyValue);
+  }
+
+  if (tool.body.kind === "urlencoded") {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(bodyValue)) {
+      if (v !== undefined && v !== null) params.append(k, scalar(v));
+    }
+    return params;
+  }
+
+  return await buildMultipart(config, tool, bodyValue);
+}
+
+async function performRequest(
+  config: Config,
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  payload: string | URLSearchParams | FormData | undefined,
+): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: payload,
+      signal: controller.signal,
+    });
+    // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
+    const body = await readBody(res);
+    return { res, body };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function executeTool(
   config: Config,
   tool: MealieTool,
@@ -273,43 +324,14 @@ export async function executeTool(
   const baseHeaders: Record<string, string> = { Accept: "application/json" };
   if (config.acceptLanguage) baseHeaders["Accept-Language"] = config.acceptLanguage;
 
-  let payload: string | URLSearchParams | FormData | undefined;
-  if (tool.body && args.body !== undefined && args.body !== null) {
-    const bodyValue = args.body as Record<string, unknown>;
-    if (tool.body.kind === "json") {
-      payload = JSON.stringify(bodyValue);
-      baseHeaders["Content-Type"] = "application/json";
-    } else if (tool.body.kind === "urlencoded") {
-      const params = new URLSearchParams();
-      for (const [k, v] of Object.entries(bodyValue)) {
-        if (v !== undefined && v !== null) params.append(k, scalar(v));
-      }
-      payload = params;
-    } else {
-      payload = await buildMultipart(config, tool, bodyValue);
-    }
-  }
+  const payload = await buildPayload(config, tool, args, baseHeaders);
 
   const send = async (forceRefresh: boolean): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> => {
     const headers = { ...baseHeaders };
     const authValue = await auth.authHeader(forceRefresh);
     if (authValue) headers.Authorization = authValue;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
-    try {
-      const res = await fetch(url, {
-        method: tool.method.toUpperCase(),
-        headers,
-        body: payload,
-        signal: controller.signal,
-      });
-      // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
-      const body = await readBody(res);
-      return { res, body };
-    } finally {
-      clearTimeout(timer);
-    }
+    return performRequest(config, url, tool.method.toUpperCase(), headers, payload);
   };
 
   const method = tool.method.toUpperCase();
