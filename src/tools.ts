@@ -165,7 +165,13 @@ function pickBody(
   return first ? { kind: "json", schema: first.schema, required, fileFields: [] } : undefined;
 }
 
-function processParams(params: OpenApiParameter[]) {
+function processParams(params: OpenApiParameter[]): {
+  properties: Record<string, JsonSchema>;
+  required: string[];
+  pathParams: string[];
+  queryParams: Array<{ name: string; isArray: boolean }>;
+  rootSchemas: Array<JsonSchema | undefined>;
+} {
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];
   const pathParams: string[] = [];
