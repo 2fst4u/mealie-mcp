@@ -28,6 +28,8 @@ export interface MealieTool {
     required: boolean;
     /** Property names that carry file contents (multipart binary fields). */
     fileFields: string[];
+    /** Precomputed set of fileFields for faster lookup in hot paths. */
+    _fileFieldsSet?: Set<string>;
   };
   deprecated: boolean;
 }
@@ -305,7 +307,12 @@ function buildTools(
       pathParams,
       queryParams,
       body: entry.body
-        ? { kind: entry.body.kind, required: entry.body.required, fileFields: entry.body.fileFields }
+        ? {
+            kind: entry.body.kind,
+            required: entry.body.required,
+            fileFields: entry.body.fileFields,
+            _fileFieldsSet: new Set(entry.body.fileFields),
+          }
         : undefined,
       deprecated: Boolean(entry.op.deprecated),
     });

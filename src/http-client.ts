@@ -193,7 +193,7 @@ async function buildMultipart(
   body: Record<string, unknown>,
 ): Promise<FormData> {
   const form = new FormData();
-  const fileFields = new Set(tool.body?.fileFields ?? []);
+  const fileFields = tool.body?._fileFieldsSet ?? new Set(tool.body?.fileFields ?? []);
   // SECURITY: Fail closed. If no upload directories are explicitly allowed,
   // uploads are refused to prevent arbitrary local file reads.
   const allowedDirs = await resolveAllowedDirs(config.allowedUploadDirs);
