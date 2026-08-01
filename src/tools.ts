@@ -407,19 +407,16 @@ export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
   // Baseline trim is unconditional and applied first so user filters can only
   // ever subtract from it, never add a hard-excluded tool back.
   const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
-  let result = tools.filter((t) => !matches(t, hardExcludeConditions));
+  const hasInclude = config.include.length > 0;
+  const includeConditions = hasInclude ? buildConditions(config.include) : [];
+  const hasExclude = config.exclude.length > 0;
+  const excludeConditions = hasExclude ? buildConditions(config.exclude) : [];
 
-  if (config.readOnly) result = result.filter((t) => t.method === "get");
-
-  if (config.include.length > 0) {
-    const includeConditions = buildConditions(config.include);
-    result = result.filter((t) => matches(t, includeConditions));
-  }
-
-  if (config.exclude.length > 0) {
-    const excludeConditions = buildConditions(config.exclude);
-    result = result.filter((t) => !matches(t, excludeConditions));
-  }
-
-  return result;
+  return tools.filter((t) => {
+    if (matches(t, hardExcludeConditions)) return false;
+    if (config.readOnly && t.method !== "get") return false;
+    if (hasInclude && !matches(t, includeConditions)) return false;
+    if (hasExclude && matches(t, excludeConditions)) return false;
+    return true;
+  });
 }
