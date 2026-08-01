@@ -4,4 +4,6 @@
 ## 2026-07-27 - Unused Constants Exposing Exports
 **Learning:** In TypeScript/ESM projects, internal constants that are only used within the defining module (like `ADMIN_EXCLUDE` used exclusively to compose `HARD_EXCLUDE`) might unnecessarily be exported, expanding the module's public surface area and triggering dead-code warnings from tools like `knip`.
 **Action:** Always verify if an exported constant is imported elsewhere using a workspace-wide grep or tools like `knip`/`ts-prune`. If it's isolated to local use, remove the `export` modifier to cleanly encapsulate it.
-## 2026-08-01 - Explicit return type added to processParams\n**Learning:** Added explicit return type to a complex function to ensure correct compilation and mapping. Type checking allows better documentation.\n**Action:** Applied changes to src/tools.ts.
+## 2026-08-01 - Explicit return types on multi-field helper functions
+**Learning:** Helpers like `processParams` in `src/tools.ts` return a five-field object that callers destructure. Relying on inference leaves the contract implicit, so an accidental rename or dropped field only surfaces at the call site rather than at the function itself.
+**Action:** Annotate the return type explicitly on helpers whose result shape is part of their contract, so the compiler pins the shape where it is defined.
