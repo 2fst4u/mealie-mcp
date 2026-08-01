@@ -17,12 +17,14 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
+// `basename()` has already dropped the directory part, so this is not about
+// containment — the allowlist check in `readUpload` owns that. It is about not
+// forwarding a name Mealie has to cope with: control characters, quotes, and
+// characters that are illegal in a filename on the far side.
 function sanitizeFilename(name: string): string {
-  let safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
-  if (!safe || /^\.+$/.test(safe)) {
-    return "upload.bin";
-  }
-  return safe;
+  const safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
+  // A name that was nothing but stripped characters, or only dots, is no name.
+  return !safe || /^\.+$/.test(safe) ? "upload.bin" : safe;
 }
 
 // Statuses worth retrying for idempotent requests: rate-limiting and transient

@@ -158,7 +158,7 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(text.includes('"name": "mealie-mcp"'));
 });
 
-test("sanitizes filenames in multipart body to prevent path traversal", async () => {
+test("sanitizes the filename sent in a multipart body", async () => {
   const tool: MealieTool = {
     name: "test_tool",
     description: "",
@@ -179,9 +179,7 @@ test("sanitizes filenames in multipart body to prevent path traversal", async ()
   });
 
   const dir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-sanitize-test-"));
-  // Using characters that should be sanitized out
-  const trickyName = 'test<script>.txt';
-  const filePath = join(dir, trickyName);
+  const filePath = join(dir, "test<script>.txt");
   await fs.writeFile(filePath, "dummy content");
 
   try {
@@ -189,15 +187,52 @@ test("sanitizes filenames in multipart body to prevent path traversal", async ()
 
     assert.ok(capturedBody instanceof FormData);
 
-    // We need to inspect the filename inside the FormData. Since the FormData API in Node's undici
-    // doesn't expose the filename directly via get(), we can stringify the body or look at the underlying state if needed.
-    // However, if we just serialize it into a Request, we can read the body.
+    // FormData exposes the part's filename only on the File it holds, and Node
+    // rebuilds that lazily — serialising through a Request is the reliable way
+    // to see the Content-Disposition line that actually goes on the wire.
     const req = new Request("http://localhost", { method: "POST", body: capturedBody });
     const textBody = await req.text();
 
-    // The tricky characters '<', '>' should have been replaced by '_'
     assert.ok(textBody.includes('filename="test_script_.txt"'));
-    assert.ok(!textBody.includes('filename="test<script>.txt"'));
+    assert.ok(!textBody.includes("test<script>"));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("falls back to a placeholder when a filename sanitizes to nothing", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "put",
+    path: "/api/recipes/upload",
+    pathParams: [],
+    queryParams: [],
+    body: { kind: "multipart", required: true, fileFields: ["image"] },
+    deprecated: false,
+  };
+
+  let capturedBody: unknown;
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
+    capturedBody = init?.body;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const dir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-sanitize-test-"));
+  // `basename()` of a path ending in "..." is "...", which is all dots and so
+  // sanitizes away entirely.
+  const filePath = join(dir, "...");
+  await fs.writeFile(filePath, "dummy content");
+
+  try {
+    await executeTool({ ...dummyConfig, allowedUploadDirs: [dir] }, tool, { body: { image: filePath } }, dummyAuth);
+
+    const req = new Request("http://localhost", { method: "POST", body: capturedBody as FormData });
+    const textBody = await req.text();
+
+    assert.ok(textBody.includes('filename="upload.bin"'));
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }
