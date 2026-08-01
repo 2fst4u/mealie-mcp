@@ -35,7 +35,12 @@ async function main(): Promise<void> {
     log("Warning: no tools matched your include/exclude filters. The server will expose nothing.");
   }
 
-  const categories = new Set(tools.map((t) => t.category));
+  // Avoid intermediate array allocation by inserting directly into Set
+  const categories = new Set<string>();
+  for (const t of tools) {
+    categories.add(t.category);
+  }
+
   log(`${SERVER_NAME} v${version}`);
   log(`Mealie: ${config.baseUrl} | spec: ${source} (${doc.info?.version ?? "unknown"} version)`);
   log(`Exposing ${tools.length}/${allTools.length} tools across ${categories.size} categories.`);
