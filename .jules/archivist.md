@@ -15,3 +15,6 @@
 ## 2026-07-30 - MEALIE_ALLOWED_UPLOAD_DIRS default behavior drift
 **Learning:** The behavior of MEALIE_ALLOWED_UPLOAD_DIRS changed to fail-closed (uploads disabled when unset) for security, but README.md, .env.example, and config.ts JSDoc were not updated, leading to inaccurate claims.
 **Action:** Update all documentation surfaces to reflect the fail-closed security posture so the correct path is accurately documented.
+## 2026-08-01 - Testing file size limits in node:test
+**Learning:** When testing large file constraints (e.g., file size limits) in `node:test` without consuming real disk space, it is better to use sparse files created via `fs.promises.open()` and `fh.truncate(size)` instead of mocking `fs.promises.stat`, as mocking named imports in ESM environments often fails due to read-only live bindings.
+**Action:** Replaced a mocked test strategy with a sparse file implementation to accurately verify the >50MB upload rejection logic.
