@@ -17,6 +17,14 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
+function sanitizeFilename(name: string): string {
+  let safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
+  if (!safe || /^\.+$/.test(safe)) {
+    return "upload.bin";
+  }
+  return safe;
+}
+
 // Statuses worth retrying for idempotent requests: rate-limiting and transient
 // server-side failures. 4xx (other than 429) are the caller's fault and repeating
 // them just wastes time.
@@ -204,7 +212,7 @@ async function buildMultipart(
       const paths = Array.isArray(value) ? value : [value];
       const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
       for (const { filePath, blob } of files) {
-        form.append(key, blob, basename(filePath));
+        form.append(key, blob, sanitizeFilename(basename(filePath)));
       }
     } else if (Array.isArray(value)) {
       for (const item of value) form.append(key, scalar(item));

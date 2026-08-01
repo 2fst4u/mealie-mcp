@@ -44,3 +44,8 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Arbitrary local file read through MCP tools when upload directories are not configured (unrestricted by default).
 **Learning:** Defaulting configurations to 'unrestricted' when empty allows for accidental exposure of local filesystem out-of-the-box, increasing risk of Local File Inclusion / Arbitrary File Read.
 **Prevention:** Always 'fail closed'. By default, sensitive features like local filesystem access should be disabled (refuse all) until explicitly enabled via a strictly-configured allowlist.
+
+## 2024-05-18 - Prevent Path Traversal in Multipart File Uploads
+**Vulnerability:** When processing file uploads, extracting the filename directly using `basename()` is insufficient if the underlying filename contains unhandled control characters or specific characters like `<`, `>`, `|`, `?`, `*` which could be manipulated to trick the target server or file system into writing outside intended directories.
+**Learning:** `basename()` solely strips directory components relative to the POSIX or Windows path format but doesn't sanitize the remaining filename for safety. Malicious filenames could bypass basic checks.
+**Prevention:** Implement a robust `sanitizeFilename` helper that strips all control characters and invalid/special characters (`[\x00-\x1F\x7F<>:"/\\|?*]`), replacing them with underscores, and provides a safe fallback (e.g., `upload.bin`) if the name becomes entirely stripped or evaluates to relative path dots (`.` or `..`). Apply this before passing filenames to APIs or writing to disk.

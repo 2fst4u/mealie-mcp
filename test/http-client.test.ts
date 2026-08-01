@@ -158,6 +158,51 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(text.includes('"name": "mealie-mcp"'));
 });
 
+test("sanitizes filenames in multipart body to prevent path traversal", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "put",
+    path: "/api/recipes/upload",
+    pathParams: [],
+    queryParams: [],
+    body: { kind: "multipart", required: true, fileFields: ["image"] },
+    deprecated: false,
+  };
+
+  let capturedBody: any;
+  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+    capturedBody = init?.body;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const dir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-sanitize-test-"));
+  // Using characters that should be sanitized out
+  const trickyName = 'test<script>.txt';
+  const filePath = join(dir, trickyName);
+  await fs.writeFile(filePath, "dummy content");
+
+  try {
+    await executeTool({ ...dummyConfig, allowedUploadDirs: [dir] }, tool, { body: { image: filePath } }, dummyAuth);
+
+    assert.ok(capturedBody instanceof FormData);
+
+    // We need to inspect the filename inside the FormData. Since the FormData API in Node's undici
+    // doesn't expose the filename directly via get(), we can stringify the body or look at the underlying state if needed.
+    // However, if we just serialize it into a Request, we can read the body.
+    const req = new Request("http://localhost", { method: "POST", body: capturedBody });
+    const textBody = await req.text();
+
+    // The tricky characters '<', '>' should have been replaced by '_'
+    assert.ok(textBody.includes('filename="test_script_.txt"'));
+    assert.ok(!textBody.includes('filename="test<script>.txt"'));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 const uploadTool: MealieTool = {
   name: "test_tool",
   description: "",
