@@ -11,6 +11,13 @@ import {
 
 type BodyKind = "json" | "urlencoded" | "multipart";
 
+export interface OperationBody {
+  kind: BodyKind;
+  schema: JsonSchema | undefined;
+  required: boolean;
+  fileFields: string[];
+}
+
 export interface MealieTool {
   /** MCP tool name: `<category>_<operation>`, unique and <= 64 chars. */
   name: string;
@@ -145,7 +152,7 @@ function findFileFields(schema: JsonSchema | undefined, components: Record<strin
 function pickBody(
   op: OpenApiOperation,
   components: Record<string, JsonSchema>,
-): { kind: BodyKind; schema: JsonSchema | undefined; required: boolean; fileFields: string[] } | undefined {
+): OperationBody | undefined {
   const content = op.requestBody?.content;
   if (!content) return undefined;
   const required = Boolean(op.requestBody?.required);
@@ -197,7 +204,7 @@ function processParams(params: OpenApiParameter[]): {
   return { properties, required, pathParams, queryParams, rootSchemas };
 }
 
-function processBody(op: OpenApiOperation, body: ReturnType<typeof pickBody>) {
+function processBody(op: OpenApiOperation, body: OperationBody | undefined) {
   const properties: Record<string, JsonSchema> = {};
   const required: string[] = [];
   const rootSchemas: Array<JsonSchema | undefined> = [];
@@ -222,7 +229,7 @@ function processBody(op: OpenApiOperation, body: ReturnType<typeof pickBody>) {
 function buildInputSchema(
   op: OpenApiOperation,
   params: OpenApiParameter[],
-  body: ReturnType<typeof pickBody>,
+  body: OperationBody | undefined,
   components: Record<string, JsonSchema>,
   defsCache: Map<string, JsonSchema>,
 ): { inputSchema: JsonSchema; pathParams: string[]; queryParams: Array<{ name: string; isArray: boolean }> } {
@@ -248,7 +255,7 @@ interface RawEntry {
   method: HttpMethod;
   op: OpenApiOperation;
   params: OpenApiParameter[];
-  body: ReturnType<typeof pickBody>;
+  body: OperationBody | undefined;
   category: string;
   base: string;
 }
