@@ -55,9 +55,8 @@ async function main(): Promise<void> {
   log("Server ready on stdio.");
 }
 
-main().catch((err) => {
-  // SECURITY: Do not leak stack traces in error output to prevent exposing internals
-  const reason = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`[mealie-mcp] Fatal: ${reason}\n`);
+main().catch(() => {
+  // SECURITY: Do not leak error messages in error output to prevent exposing internals (Information Exposure)
+  process.stderr.write(`[mealie-mcp] Fatal: An unexpected fatal error occurred\n`);
   process.exit(1);
 });

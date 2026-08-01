@@ -66,7 +66,7 @@ test("index.ts handles fatal errors and exits with 1", () => {
     MEALIE_BASE_URL: "",
   });
   assert.equal(status, 1);
-  assert.ok(stderr.includes("[mealie-mcp] Fatal: MEALIE_BASE_URL is required"));
+  assert.ok(stderr.includes("[mealie-mcp] Fatal: An unexpected fatal error occurred"));
 });
 
 test("index.ts logs a warning if no tools match the filters", () => {

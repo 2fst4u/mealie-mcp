@@ -44,3 +44,8 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Arbitrary local file read through MCP tools when upload directories are not configured (unrestricted by default).
 **Learning:** Defaulting configurations to 'unrestricted' when empty allows for accidental exposure of local filesystem out-of-the-box, increasing risk of Local File Inclusion / Arbitrary File Read.
 **Prevention:** Always 'fail closed'. By default, sensitive features like local filesystem access should be disabled (refuse all) until explicitly enabled via a strictly-configured allowlist.
+
+## 2025-02-24 - Information Exposure in Unhandled Rejections
+**Vulnerability:** Information Exposure (CWE-209). In `src/index.ts`, unhandled exceptions caught by the top-level `main().catch()` handler printed `err.message` (or `String(err)`) to standard error. In many hosting environments or MCP clients, standard error output can be logged or directly exposed to users. Outputting untrusted or dynamic error messages from internal exceptions can leak sensitive implementation details, configuration secrets, file paths, or network data that happened to be included in the original Error object's message.
+**Learning:** Even if stack traces are omitted, raw error messages from deep within the application or its dependencies are not safe to print to user-facing or widely-accessible log streams.
+**Prevention:** Unhandled exception handlers at the boundary of an application should print a static, generic, and safe error message (e.g., "An unexpected fatal error occurred") to avoid unintentional information exposure.
