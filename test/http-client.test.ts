@@ -254,6 +254,25 @@ test("rejects an upload path that is not a regular file", async () => {
   );
 });
 
+test("rejects an upload that exceeds the maximum file size", async () => {
+  const dir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-"));
+  const bigFile = join(dir, "big.txt");
+
+  // Create a >50MB sparse file
+  const fh = await fs.open(bigFile, "w");
+  await fh.truncate(50 * 1024 * 1024 + 1);
+  await fh.close();
+
+  try {
+    await assert.rejects(
+      () => executeTool({ ...dummyConfig, allowedUploadDirs: [dir] }, uploadTool, { body: { image: bigFile } }, dummyAuth),
+      /exceeds the maximum allowed size of 50MB/,
+    );
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
 // MEALIE_ALLOWED_UPLOAD_DIRS — opt-in allowlist for multipart uploads.
 
 /** Builds `<root>/inside/ok.png` plus an out-of-bounds `<root>/outside/secret.png`. */
