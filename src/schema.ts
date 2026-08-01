@@ -59,9 +59,9 @@ function collectRefs(
   // ⚡ Bolt: Using for...in avoids Object.entries() which allocates an array
   // of all key-value pairs on every recursive call, severely hurting performance.
   for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      if (key !== "$ref") collectRefs(obj[key], components, seen);
-    }
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    if (key === "$ref") continue;
+    collectRefs(obj[key], components, seen);
   }
 }
 
