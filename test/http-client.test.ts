@@ -459,7 +459,7 @@ test("skips JSON parse for excessively large JSON responses", async () => {
   });
 
   const originalParse = JSON.parse;
-  const parseMock = mock.method(JSON, "parse", function (text: string) {
+  const parseMock = mock.method(JSON, "parse", function (this: any, text: string) {
     return originalParse.apply(this, arguments as any);
   });
 
