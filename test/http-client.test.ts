@@ -74,6 +74,32 @@ test("builds correct URL with path and query parameters", async () => {
   assert.equal(capturedUrl, "https://api.example.com/api/users/123/posts?tags=a&tags=b&limit=10");
 });
 
+test("formats array query parameters into repeated key pairs even if schema isArray is false", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/search",
+    pathParams: [],
+    queryParams: [{ name: "filters", isArray: false }],
+    deprecated: false,
+  };
+
+  const args = { filters: ["vegan", "gluten-free"] };
+
+  let capturedUrl: string | undefined;
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
+    capturedUrl = url.toString();
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(dummyConfig, tool, args, dummyAuth);
+
+  assert.equal(capturedUrl, "https://api.example.com/api/search?filters=vegan&filters=gluten-free");
+});
+
 test("sends JSON body correctly", async () => {
   const tool: MealieTool = {
     name: "test_tool",
