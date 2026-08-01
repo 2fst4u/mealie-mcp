@@ -259,7 +259,12 @@ function collectOperations(
     for (const method of HTTP_METHODS) {
       const op = item[method];
       if (!op) continue;
-      const params = [...sharedParams, ...(op.parameters ?? [])];
+      const opParams = op.parameters;
+      const params = !opParams?.length
+        ? sharedParams
+        : !sharedParams.length
+          ? opParams
+          : [...sharedParams, ...opParams];
       const body = pickBody(op, components);
       const { category, base } = nameParts(op, path, method);
       baseCounts[base] = (baseCounts[base] ?? 0) + 1;
