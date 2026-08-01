@@ -436,6 +436,49 @@ test("formats and truncates JSON response", async () => {
   assert.ok(txt.includes("[truncated"));
 });
 
+test("skips JSON parse for excessively large JSON responses", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/huge-json",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  const hugeString = "x".repeat(100_000 * 5 + 1);
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(hugeString, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  const originalParse = JSON.parse;
+  const parseMock = mock.method(JSON, "parse", function (text: string) {
+    return originalParse.apply(this, arguments as any);
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+
+  assert.ok(txt.includes("[truncated"));
+
+  let hugeStringParsed = false;
+  for (const call of parseMock.mock.calls) {
+    if (call.arguments[0] === hugeString) {
+      hugeStringParsed = true;
+    }
+  }
+  assert.equal(hugeStringParsed, false, "JSON.parse should not be called with huge string");
+});
+
 test("handles invalid JSON response gracefully", async () => {
   const tool: MealieTool = {
     name: "test_tool",
