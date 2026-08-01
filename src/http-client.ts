@@ -17,6 +17,16 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
+// `basename()` has already dropped the directory part, so this is not about
+// containment — the allowlist check in `readUpload` owns that. It is about not
+// forwarding a name Mealie has to cope with: control characters, quotes, and
+// characters that are illegal in a filename on the far side.
+function sanitizeFilename(name: string): string {
+  const safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
+  // A name that was nothing but stripped characters, or only dots, is no name.
+  return !safe || /^\.+$/.test(safe) ? "upload.bin" : safe;
+}
+
 // Statuses worth retrying for idempotent requests: rate-limiting and transient
 // server-side failures. 4xx (other than 429) are the caller's fault and repeating
 // them just wastes time.
@@ -204,7 +214,7 @@ async function buildMultipart(
       const paths = Array.isArray(value) ? value : [value];
       const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
       for (const { filePath, blob } of files) {
-        form.append(key, blob, basename(filePath));
+        form.append(key, blob, sanitizeFilename(basename(filePath)));
       }
     } else if (Array.isArray(value)) {
       for (const item of value) form.append(key, scalar(item));
