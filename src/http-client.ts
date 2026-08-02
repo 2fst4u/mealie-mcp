@@ -208,19 +208,30 @@ async function buildMultipart(
   // uploads are refused to prevent arbitrary local file reads.
   const allowedDirs = await resolveAllowedDirs(config.allowedUploadDirs);
 
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined || value === null) continue;
+  const tasks = Object.entries(body).map(async ([key, value]) => {
+    if (value === undefined || value === null) return undefined;
     if (fileFields.has(key)) {
       const paths = Array.isArray(value) ? value : [value];
       const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
-      for (const { filePath, blob } of files) {
-        form.append(key, blob, sanitizeFilename(basename(filePath)));
-      }
+      return () => {
+        for (const { filePath, blob } of files) {
+          form.append(key, blob, sanitizeFilename(basename(filePath)));
+        }
+      };
     } else if (Array.isArray(value)) {
-      for (const item of value) form.append(key, scalar(item));
+      return () => {
+        for (const item of value) form.append(key, scalar(item));
+      };
     } else {
-      form.append(key, scalar(value));
+      return () => {
+        form.append(key, scalar(value));
+      };
     }
+  });
+
+  const appenders = await Promise.all(tasks);
+  for (const append of appenders) {
+    if (append) append();
   }
   return form;
 }
