@@ -1,6 +1,7 @@
-import { readFile, realpath, stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import * as fs from "node:fs";
 import { basename, extname, sep } from "node:path";
+import { Readable } from "node:stream";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -193,8 +194,28 @@ async function readUpload(
   // An `openAsBlob` part is lazy: the bytes are pulled during `fetch`, so the
   // file has to stay put until the request goes out.
   if (openAsBlob) return { filePath, blob: await openAsBlob(realPath, { type }) };
-  const data = await readFile(realPath);
-  return { filePath, blob: new Blob([new Uint8Array(data)], { type }) };
+
+  // Fallback for Node 18: create a duck-typed Blob that streams the file
+  // to avoid loading up to 50MB into the V8 heap at once.
+  const blob = {
+    [Symbol.toStringTag]: "Blob",
+    type,
+    size: stats.size,
+    stream() {
+      return Readable.toWeb(fs.createReadStream(realPath));
+    },
+    arrayBuffer() {
+      return Promise.reject(new Error("unsupported"));
+    },
+    slice() {
+      return this;
+    },
+    text() {
+      return Promise.reject(new Error("unsupported"));
+    },
+  } as unknown as Blob;
+
+  return { filePath, blob };
 }
 
 async function buildMultipart(
