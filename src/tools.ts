@@ -282,6 +282,22 @@ function collectOperations(
   return { entries, baseCounts };
 }
 
+function resolveToolName(
+  entry: RawEntry,
+  baseCounts: Record<string, number>,
+  usedNames: Set<string>,
+  nameMax: number,
+): string {
+  const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
+  let name = rawName;
+  for (let i = 2; usedNames.has(name); i++) {
+    const suffix = `_${i}`;
+    name = `${clampName(rawName, nameMax - suffix.length)}${suffix}`;
+  }
+  usedNames.add(name);
+  return name;
+}
+
 function buildTools(
   entries: RawEntry[],
   baseCounts: Record<string, number>,
@@ -292,13 +308,7 @@ function buildTools(
   const usedNames = new Set<string>();
   const defsCache = new Map<string, JsonSchema>();
   for (const entry of entries) {
-    const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
-    let name = rawName;
-    for (let i = 2; usedNames.has(name); i++) {
-      const suffix = `_${i}`;
-      name = `${clampName(rawName, nameMax - suffix.length)}${suffix}`;
-    }
-    usedNames.add(name);
+    const name = resolveToolName(entry, baseCounts, usedNames, nameMax);
 
     const { inputSchema, pathParams, queryParams } = buildInputSchema(
       entry.op,
