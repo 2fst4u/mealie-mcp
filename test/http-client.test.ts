@@ -847,3 +847,53 @@ test("empty error body does not report Success", async () => {
   assert.doesNotMatch(txt, /Success/);
   assert.match(txt, /HTTP 404 Not Found/);
 });
+test("securely constructs URLs to prevent host-spoofing", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "@evil.com/api/data",
+    pathParams: [],
+    queryParams: [],
+    body: undefined,
+    deprecated: false,
+  };
+
+  let capturedUrl = "";
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
+    capturedUrl = url.toString();
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(dummyConfig, tool, {}, dummyAuth);
+
+  assert.equal(capturedUrl, "https://api.example.com/@evil.com/api/data");
+});
+
+test("preserves config.baseUrl subpaths when constructing URLs", async () => {
+  const subpathConfig: Config = { ...dummyConfig, baseUrl: "https://api.example.com/mealie-subpath" };
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/data",
+    pathParams: [],
+    queryParams: [],
+    body: undefined,
+    deprecated: false,
+  };
+
+  let capturedUrl = "";
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
+    capturedUrl = url.toString();
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(subpathConfig, tool, {}, dummyAuth);
+
+  assert.equal(capturedUrl, "https://api.example.com/mealie-subpath/api/data");
+});
