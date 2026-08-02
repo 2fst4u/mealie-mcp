@@ -202,16 +202,16 @@ async function readUpload(
     type,
     size: stats.size,
     stream() {
-      return Readable.toWeb(fs.createReadStream(realPath));
+      return Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
     },
     arrayBuffer() {
-      return Promise.reject(new Error("unsupported"));
+      return new Response((this as any).stream()).arrayBuffer();
     },
     slice() {
       return this;
     },
     text() {
-      return Promise.reject(new Error("unsupported"));
+      return new Response((this as any).stream()).text();
     },
   } as unknown as Blob;
 
