@@ -110,7 +110,9 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
     path = path.replace(`{${name}}`, encodeURIComponent(String(value)));
   }
 
-  const url = new URL(config.baseUrl + path);
+  const safeBase = config.baseUrl.endsWith("/") ? config.baseUrl : config.baseUrl + "/";
+  const safePath = path.startsWith("/") ? path.slice(1) : path;
+  const url = new URL(safePath, safeBase);
   for (const { name } of tool.queryParams) {
     const value = args[name];
     if (value === undefined || value === null) continue;
