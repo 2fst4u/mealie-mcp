@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, list } from "../src/config.js";
 
 test("throws when MEALIE_BASE_URL is missing", () => {
   assert.throws(() => loadConfig({} as NodeJS.ProcessEnv), /MEALIE_BASE_URL is required/);
@@ -125,4 +125,13 @@ test("parses the upload allowlist and defaults to empty", () => {
     MEALIE_ALLOWED_UPLOAD_DIRS: " /srv/uploads , /home/me/pics ,",
   } as NodeJS.ProcessEnv);
   assert.deepEqual(set.allowedUploadDirs, ["/srv/uploads", "/home/me/pics"]);
+});
+
+test("config list parser behaves correctly on all edge cases", () => {
+  assert.deepEqual(list(undefined), []);
+  assert.deepEqual(list(""), []);
+  assert.deepEqual(list("foo"), ["foo"]);
+  assert.deepEqual(list("foo,bar"), ["foo", "bar"]);
+  assert.deepEqual(list(" foo , bar "), ["foo", "bar"]);
+  assert.deepEqual(list("foo,,bar,"), ["foo", "bar"]);
 });
