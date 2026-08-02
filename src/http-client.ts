@@ -1,6 +1,7 @@
-import { readFile, realpath, stat } from "node:fs/promises";
-import * as fs from "node:fs";
+import { realpath, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import { basename, extname, sep } from "node:path";
+import { Readable } from "node:stream";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -37,12 +38,41 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 // `fs.openAsBlob` hands `fetch` a file-backed Blob it can stream straight off
 // disk, so a 50MB upload never lands in the V8 heap. It arrived in Node 19.8
-// and `engines` still allows 18, where we fall back to buffering the bytes.
-// It has to be read off the namespace rather than imported by name: a static
-// named import of a missing builtin export is a link-time SyntaxError, which
-// would take down the whole server on Node 18 instead of just this one path.
-const openAsBlob: typeof fs.openAsBlob | undefined =
-  typeof fs.openAsBlob === "function" ? fs.openAsBlob : undefined;
+// and `engines` still allows 18, where we fall back to a custom StreamBlob.
+const openAsBlob: typeof import("node:fs").openAsBlob | undefined =
+  typeof (await import("node:fs")).openAsBlob === "function" ? (await import("node:fs")).openAsBlob : undefined;
+
+// In Node 18+, fetch accepts a duck-typed Blob. We use a stream-backed object
+// so a 50MB upload never lands in the V8 heap and prevents memory exhaustion.
+class StreamBlob {
+  constructor(
+    public readonly path: string,
+    public readonly type: string,
+    public readonly size: number,
+  ) {}
+
+  get [Symbol.toStringTag]() {
+    return "Blob";
+  }
+
+  stream() {
+    return Readable.toWeb(createReadStream(this.path));
+  }
+
+  // undici's FormData implementation delegates to these methods when extracting
+  // files back out (e.g. in tests using `form.get('image').text()`).
+  text() {
+    return new Response(this.stream()).text();
+  }
+
+  arrayBuffer() {
+    return new Response(this.stream()).arrayBuffer();
+  }
+
+  slice() {
+    return this;
+  }
+}
 
 // Every part used to go out as a typeless Blob, which multipart serializes as
 // `application/octet-stream` — so an uploaded JPEG announced itself as opaque
@@ -190,11 +220,14 @@ async function readUpload(
   // Name and MIME type come from the path the caller asked for; the bytes come
   // from the real path that was actually vetted.
   const type = mimeTypeFor(filePath);
-  // An `openAsBlob` part is lazy: the bytes are pulled during `fetch`, so the
+  // The stream is lazy: the bytes are pulled during `fetch`, so the
   // file has to stay put until the request goes out.
-  if (openAsBlob) return { filePath, blob: await openAsBlob(realPath, { type }) };
-  const data = await readFile(realPath);
-  return { filePath, blob: new Blob([new Uint8Array(data)], { type }) };
+  if (openAsBlob) {
+    return { filePath, blob: await openAsBlob(realPath, { type }) };
+  }
+
+  const blob = new StreamBlob(realPath, type, stats.size) as unknown as Blob;
+  return { filePath, blob };
 }
 
 async function buildMultipart(

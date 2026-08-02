@@ -179,7 +179,8 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(capturedBody instanceof FormData);
   assert.equal(capturedBody.get("title"), "My Recipe");
   const blob = capturedBody.get("image") as Blob;
-  assert.ok(blob instanceof Blob);
+  // It is a File (which extends Blob in the standard, but checking `blob.text` works on our duck-typed Blob/File in Undici)
+  assert.ok(typeof blob.text === 'function');
   const text = await blob.text();
   assert.ok(text.includes('"name": "mealie-mcp"'));
 });
