@@ -62,6 +62,11 @@ class OAuthTokenProvider implements TokenProvider {
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     let res: Response;
     let rawText: string;
+
+    // SECURITY: Sanitize tokenUrl for error messages to avoid leaking query parameters
+    const parsedUrl = new URL(this.oauth.tokenUrl);
+    const safeUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+
     try {
       res = await fetch(this.oauth.tokenUrl, {
         method: "POST",
@@ -76,7 +81,7 @@ class OAuthTokenProvider implements TokenProvider {
       rawText = await res.text();
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      throw new Error(`OAuth token request to ${this.oauth.tokenUrl} failed: ${reason}`);
+      throw new Error(`OAuth token request to ${safeUrl} failed: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
@@ -84,7 +89,7 @@ class OAuthTokenProvider implements TokenProvider {
     if (!res.ok) {
       // SECURITY: Do not include rawText in the error message to avoid leaking sensitive information.
       throw new Error(
-        `OAuth token request to ${this.oauth.tokenUrl} returned HTTP ${res.status} ${res.statusText}`,
+        `OAuth token request to ${safeUrl} returned HTTP ${res.status} ${res.statusText}`,
       );
     }
 
@@ -92,10 +97,10 @@ class OAuthTokenProvider implements TokenProvider {
     try {
       parsed = JSON.parse(rawText) as TokenResponse;
     } catch {
-      throw new Error(`OAuth token response from ${this.oauth.tokenUrl} was not valid JSON.`);
+      throw new Error(`OAuth token response from ${safeUrl} was not valid JSON.`);
     }
     if (!parsed.access_token) {
-      throw new Error(`OAuth token response from ${this.oauth.tokenUrl} did not include an access_token.`);
+      throw new Error(`OAuth token response from ${safeUrl} did not include an access_token.`);
     }
 
     const lifetimeMs = (parsed.expires_in ?? DEFAULT_LIFETIME_S) * 1000;
