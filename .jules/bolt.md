@@ -72,3 +72,6 @@ effect to record.
 ## 2024-07-29 - Precompute static MCP tool lists
 **Learning:** In MCP servers (`@modelcontextprotocol/sdk/server`), returning the tool list in the `ListToolsRequestSchema` handler by dynamically mapping the array of tools (e.g. `tools.map(t => ...)` ) allocates hundreds of new objects on every request. Since the list of exposed tools in `mealie-mcp` is static after startup, this creates unnecessary GC churn and degrades performance for clients that frequently poll.
 **Action:** Always precompute and cache the static tools list response during server initialization instead of dynamically assembling it on every `ListToolsRequest`.
+## 2023-11-20 - Non-blocking file operations in startup path
+**Learning:** Using synchronous file I/O operations like `readFileSync` within an async context (such as an async initialization or startup path) can unnecessarily block the Node.js event loop, preventing it from handling other events.
+**Action:** Replaced `readFileSync` with the async `readFile` from `node:fs/promises` in `src/index.ts` to ensure that reading the version from `package.json` does not block the main event loop during application startup.
