@@ -7,3 +7,6 @@
 ## 2026-08-01 - Explicit return types on multi-field helper functions
 **Learning:** Helpers like `processParams` in `src/tools.ts` return a five-field object that callers destructure. Relying on inference leaves the contract implicit, so an accidental rename or dropped field only surfaces at the call site rather than at the function itself.
 **Action:** Annotate the return type explicitly on helpers whose result shape is part of their contract, so the compiler pins the shape where it is defined.
+## 2026-08-16 - Unused Types/Interfaces Exposing Exports
+**Learning:** Similarly to unused constant exports, in TypeScript projects, internal types and interfaces (like `OperationBody` in `src/tools.ts`) might unnecessarily be exported, expanding the module's public surface area and triggering dead-code warnings from tools like `knip`.
+**Action:** Always verify if an exported type/interface is imported elsewhere. If it's isolated to local use, remove the `export` modifier to cleanly encapsulate it.

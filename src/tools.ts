@@ -11,7 +11,7 @@ import {
 
 type BodyKind = "json" | "urlencoded" | "multipart";
 
-export interface OperationBody {
+interface OperationBody {
   kind: BodyKind;
   schema: JsonSchema | undefined;
   required: boolean;
