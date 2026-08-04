@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildDefs, localize, COMPONENT_REF_PREFIX } from "../src/schema.js";
+import { buildDefs, localize, clone, COMPONENT_REF_PREFIX } from "../src/schema.js";
 import type { JsonSchema } from "../src/openapi-types.js";
 
 test("localize handles undefined", () => {
@@ -196,4 +196,79 @@ test("buildDefs uses the cache", () => {
   assert.equal(defs?.A, cachedA); // Object reference should be exactly the cached one
   assert.deepEqual(defs?.B, { type: "number", description: "from components" }); // newly cloned
   assert.equal(cache.get("B"), defs?.B); // added to cache
+});
+
+test("clone returns primitive values as-is", () => {
+  assert.equal(clone(null), null);
+  assert.equal(clone(undefined), undefined);
+  assert.equal(clone("string"), "string");
+  assert.equal(clone(123), 123);
+  assert.equal(clone(true), true);
+  assert.equal(clone(false), false);
+});
+
+test("clone deeply copies arrays", () => {
+  const empty: any[] = [];
+  assert.deepEqual(clone(empty), empty);
+  assert.notEqual(clone(empty), empty);
+
+  const flat = [1, "two", true, null];
+  assert.deepEqual(clone(flat), flat);
+  assert.notEqual(clone(flat), flat);
+
+  const nested = [[1], [2, 3]];
+  const clonedNested = clone(nested);
+  assert.deepEqual(clonedNested, nested);
+  assert.notEqual(clonedNested, nested);
+  assert.notEqual(clonedNested[0], nested[0]);
+  assert.notEqual(clonedNested[1], nested[1]);
+});
+
+test("clone deeply copies objects", () => {
+  const empty = {};
+  assert.deepEqual(clone(empty), empty);
+  assert.notEqual(clone(empty), empty);
+
+  const flat = { a: 1, b: "two", c: true, d: null };
+  assert.deepEqual(clone(flat), flat);
+  assert.notEqual(clone(flat), flat);
+
+  const nested = { a: { b: 1 }, c: { d: 2 } };
+  const clonedNested = clone(nested);
+  assert.deepEqual(clonedNested, nested);
+  assert.notEqual(clonedNested, nested);
+  assert.notEqual(clonedNested.a, nested.a);
+  assert.notEqual(clonedNested.c, nested.c);
+
+  const withArray = { a: [1, 2], b: { c: [3, 4] } };
+  const clonedWithArray = clone(withArray);
+  assert.deepEqual(clonedWithArray, withArray);
+  assert.notEqual(clonedWithArray, withArray);
+  assert.notEqual(clonedWithArray.a, withArray.a);
+  assert.notEqual(clonedWithArray.b, withArray.b);
+  assert.notEqual(clonedWithArray.b.c, withArray.b.c);
+});
+
+// The guard these cover was added in response to a real prototype-pollution
+// finding (see .jules/sentinel.md, 2026-07-21). `clone` runs over schemas
+// parsed from a remote OpenAPI document, so a hostile `__proto__` key reaching
+// Object.prototype would poison every object in the process.
+test("clone drops keys that would pollute the prototype", () => {
+  const hostile = JSON.parse('{"a":1,"__proto__":{"polluted":true},"constructor":{"x":1},"prototype":{"y":1}}');
+
+  const cloned = clone(hostile) as Record<string, unknown>;
+
+  assert.deepEqual(Object.keys(cloned), ["a"]);
+  assert.equal(({} as Record<string, unknown>).polluted, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "__proto__"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "constructor"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "prototype"), false);
+});
+
+test("clone leaves Object.prototype untouched for nested hostile keys", () => {
+  const hostile = JSON.parse('{"outer":{"__proto__":{"nested":true}}}');
+
+  clone(hostile);
+
+  assert.equal(({} as Record<string, unknown>).nested, undefined);
 });

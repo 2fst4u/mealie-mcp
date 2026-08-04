@@ -53,3 +53,16 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** When processing file uploads, reading an entire file into memory using `fs.readFile` (e.g. allocating a 50MB buffer in the V8 heap) can lead to rapid memory exhaustion or Out-of-Memory (OOM) crashes, especially under concurrent requests.
 **Learning:** Node 18 supports native `fetch` (via Undici) which can stream files via Web Streams, but it doesn't natively expose `File` or `openAsBlob`. You can duck-type a `Blob` for `FormData` to consume by providing an object with `stream()` returning `Readable.toWeb(fs.createReadStream(path))`, along with `type`, `size`, `[Symbol.toStringTag]`, `arrayBuffer()`, and `slice()`.
 **Prevention:** Instead of reading files fully into memory before upload, always leverage streaming constructs (like Web Streams via `Readable.toWeb()`) for HTTP requests. Fallbacks for missing native file-streaming APIs (like `openAsBlob`) should use duck-typed stream-backed Blob representations instead of `readFile()`.
+## 2024-05-18 - Prevent Host-Spoofing via Unsafe URL Concatenation
+**Vulnerability:** Constructing a URL by simply concatenating a base URL string and an attacker-controlled path string (e.g., `const url = new URL(config.baseUrl + path)`) is vulnerable to host-spoofing and SSRF. If the base URL does not end in a slash, and the attacker provides a path starting with `@` (e.g., `@evil.com`), the resulting string `https://example.com@evil.com` is parsed with `evil.com` as the host.
+**Learning:** The URL constructor's two-argument form (`new URL(path, base)`) is the standard, secure way to resolve relative paths against a base URL.
+**Prevention:** Always use `new URL(path, base)`. To ensure the base path isn't mistakenly overridden by a leading slash in the relative path, strip leading slashes from the path (e.g., `path.replace(/^\/+/, "")`) and ensure the base URL ends with a trailing slash (e.g., `config.baseUrl + "/"`).
+
+## 2026-08-02 - URL Sanitization in Error Messages
+**Vulnerability:** Logging raw external URLs in error messages can leak sensitive information like query parameters or inline credentials.
+**Learning:** Constructing a sanitized URL from `new URL(url).origin` and `pathname` ensures potentially sensitive query strings or fragments are safely stripped out.
+**Prevention:** Sanitize external URLs (e.g., extracting only the origin and pathname via `new URL()`) before including them in error messages to prevent leaking sensitive query parameters or credentials.
+## 2025-02-14 - Fix Uncaught Exception on Null JSON from OAuth Provider
+**Vulnerability:** A `TypeError` uncaught exception could occur if the JSON parsed from the OAuth Token Provider response was `null` (e.g. from a raw text body of "null") or a primitive, crashing the server because the code immediately tried to access `.access_token` on the result.
+**Learning:** `JSON.parse` does not always return an object. Valid JSON primitives like `"null"` parse to `null`, meaning property access will throw a fatal `TypeError`.
+**Prevention:** Always check that the parsed JSON result is a truthy object (e.g. `!parsed || typeof parsed !== 'object'`) before accessing properties on it when handling external or untrusted data sources.
