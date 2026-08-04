@@ -116,7 +116,7 @@ function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
 }
 
 /** Resolve a possibly-$ref'd schema to its target object (one hop) for inspection. */
-function resolveSchema(schema: JsonSchema | undefined, components: Record<string, JsonSchema>): JsonSchema | undefined {
+export function resolveSchema(schema: JsonSchema | undefined, components: Record<string, JsonSchema>): JsonSchema | undefined {
   if (!schema) return undefined;
   const ref = schema.$ref;
   if (typeof ref === "string" && ref.startsWith(COMPONENT_REF_PREFIX)) {
