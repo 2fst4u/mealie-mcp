@@ -71,7 +71,7 @@ export function bool(value: string | undefined, fallback = false): boolean {
   return /^(1|true|yes|on)$/i.test(value.trim());
 }
 
-function list(value: string | undefined): string[] {
+export function list(value: string | undefined): string[] {
   if (!value) return [];
   return value
     .split(",")

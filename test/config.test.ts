@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, bool } from "../src/config.js";
+import { loadConfig, bool, list } from "../src/config.js";
 
 test("bool function parses truthy values correctly", () => {
   assert.equal(bool("1"), true);
@@ -153,4 +153,13 @@ test("parses the upload allowlist and defaults to empty", () => {
     MEALIE_ALLOWED_UPLOAD_DIRS: " /srv/uploads , /home/me/pics ,",
   } as NodeJS.ProcessEnv);
   assert.deepEqual(set.allowedUploadDirs, ["/srv/uploads", "/home/me/pics"]);
+});
+
+test("config list parser behaves correctly on all edge cases", () => {
+  assert.deepEqual(list(undefined), []);
+  assert.deepEqual(list(""), []);
+  assert.deepEqual(list("foo"), ["foo"]);
+  assert.deepEqual(list("foo,bar"), ["foo", "bar"]);
+  assert.deepEqual(list(" foo , bar "), ["foo", "bar"]);
+  assert.deepEqual(list("foo,,bar,"), ["foo", "bar"]);
 });
