@@ -3,7 +3,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { generateTools, filterTools, DEFAULT_EXCLUDE, HARD_EXCLUDE, schemaAllowsArray, type MealieTool } from "../src/tools.js";
+import {
+  generateTools,
+  filterTools,
+  DEFAULT_EXCLUDE,
+  HARD_EXCLUDE,
+  resolveSchema,
+  schemaAllowsArray,
+  type MealieTool,
+} from "../src/tools.js";
 import type { Config } from "../src/config.js";
 import { makeConfig } from "./helpers.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
@@ -221,4 +229,29 @@ test("schemaAllowsArray identifies array and composite array schemas", () => {
       { oneOf: [{ type: "integer" }, { type: "array" }] }
     ]
   }), true);
+});
+
+test("resolveSchema behaves correctly", () => {
+  const components = {
+    MyComponent: { type: "object", properties: { id: { type: "integer" } } },
+  };
+
+  // Undefined schema
+  assert.equal(resolveSchema(undefined, components), undefined);
+
+  // Schema without $ref
+  const noRef = { type: "string" };
+  assert.equal(resolveSchema(noRef, components), noRef);
+
+  // Schema with unresolvable $ref
+  const badRef = { $ref: "#/components/schemas/MissingComponent" };
+  assert.equal(resolveSchema(badRef, components), badRef);
+
+  // Schema with a non-string $ref (edge case not explicitly in requirements but good to test based on logic `typeof ref === "string"`)
+  const nonStringRef = { $ref: 123 as any };
+  assert.equal(resolveSchema(nonStringRef, components), nonStringRef);
+
+  // Schema with resolvable $ref
+  const goodRef = { $ref: "#/components/schemas/MyComponent" };
+  assert.equal(resolveSchema(goodRef, components), components.MyComponent);
 });
