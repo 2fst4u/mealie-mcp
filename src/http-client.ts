@@ -1,6 +1,7 @@
-import { readFile, realpath, stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import * as fs from "node:fs";
 import { basename, extname, sep } from "node:path";
+import { Readable } from "node:stream";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
@@ -37,7 +38,8 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 // `fs.openAsBlob` hands `fetch` a file-backed Blob it can stream straight off
 // disk, so a 50MB upload never lands in the V8 heap. It arrived in Node 19.8
-// and `engines` still allows 18, where we fall back to buffering the bytes.
+// and `engines` still allows 18, where we fall back to the stream-backed
+// stand-in below, which keeps the same streaming property.
 // It has to be read off the namespace rather than imported by name: a static
 // named import of a missing builtin export is a link-time SyntaxError, which
 // would take down the whole server on Node 18 instead of just this one path.
@@ -202,8 +204,28 @@ async function readUpload(
   // An `openAsBlob` part is lazy: the bytes are pulled during `fetch`, so the
   // file has to stay put until the request goes out.
   if (openAsBlob) return { filePath, blob: await openAsBlob(realPath, { type }) };
-  const data = await readFile(realPath);
-  return { filePath, blob: new Blob([new Uint8Array(data)], { type }) };
+
+  // Fallback for Node 18: create a duck-typed Blob that streams the file
+  // to avoid loading up to 50MB into the V8 heap at once.
+  const blob = {
+    [Symbol.toStringTag]: "Blob",
+    type,
+    size: stats.size,
+    stream() {
+      return Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
+    },
+    arrayBuffer() {
+      return new Response((this as any).stream()).arrayBuffer();
+    },
+    slice() {
+      return this;
+    },
+    text() {
+      return new Response((this as any).stream()).text();
+    },
+  } as unknown as Blob;
+
+  return { filePath, blob };
 }
 
 async function buildMultipart(
