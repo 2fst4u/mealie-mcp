@@ -38,7 +38,8 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 // `fs.openAsBlob` hands `fetch` a file-backed Blob it can stream straight off
 // disk, so a 50MB upload never lands in the V8 heap. It arrived in Node 19.8
-// and `engines` still allows 18, where we fall back to buffering the bytes.
+// and `engines` still allows 18, where we fall back to the stream-backed
+// stand-in below, which keeps the same streaming property.
 // It has to be read off the namespace rather than imported by name: a static
 // named import of a missing builtin export is a link-time SyntaxError, which
 // would take down the whole server on Node 18 instead of just this one path.

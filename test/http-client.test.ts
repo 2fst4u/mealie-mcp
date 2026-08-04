@@ -178,8 +178,13 @@ test("sends multipart body and reads local files", async () => {
 
   assert.ok(capturedBody instanceof FormData);
   assert.equal(capturedBody.get("title"), "My Recipe");
-  const blob = capturedBody.get("image") as Blob;
-  assert.ok(blob instanceof Blob);
+  // Not `instanceof Blob`: on Node < 19.8 there is no `openAsBlob`, so the part
+  // is the stream-backed stand-in, which undici wraps as its own `FileLike`
+  // rather than a real Blob. Assert the properties an upload part is actually
+  // required to have — they hold on both paths.
+  const blob = capturedBody.get("image") as File;
+  assert.equal(blob.name, "package.json");
+  assert.equal(blob.type, "application/json");
   const text = await blob.text();
   assert.ok(text.includes('"name": "mealie-mcp"'));
 });
