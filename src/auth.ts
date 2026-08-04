@@ -94,7 +94,7 @@ class OAuthTokenProvider implements TokenProvider {
     } catch {
       throw new Error(`OAuth token response from ${this.oauth.tokenUrl} was not valid JSON.`);
     }
-    if (!parsed.access_token) {
+    if (!parsed || typeof parsed !== "object" || !parsed.access_token) {
       throw new Error(`OAuth token response from ${this.oauth.tokenUrl} did not include an access_token.`);
     }
 
