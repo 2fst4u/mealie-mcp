@@ -49,6 +49,11 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** The multipart filename sent to Mealie was `basename(filePath)` verbatim. `basename()` strips directory components, so this is not a traversal hole on its own, but it does forward whatever else the on-disk name contains — control characters, quotes, and characters that are illegal in a filename on the receiving end.
 **Learning:** Path containment and filename safety are separate concerns. The allowlist and `realpath()` check decide *which file* may be read; they say nothing about whether the *name* is safe to hand to another system that may write it to disk or echo it into a header.
 **Prevention:** Sanitize the name at the boundary: replace control characters and `<>:"/\|?*` with underscores, and fall back to `upload.bin` when the result is empty or only dots. Sanitize on the way out, in addition to (not instead of) validating the path on the way in.
+
+## 2026-08-02 - URL Sanitization in Error Messages
+**Vulnerability:** Logging raw external URLs in error messages can leak sensitive information like query parameters or inline credentials.
+**Learning:** Constructing a sanitized URL from `new URL(url).origin` and `pathname` ensures potentially sensitive query strings or fragments are safely stripped out.
+**Prevention:** Sanitize external URLs (e.g., extracting only the origin and pathname via `new URL()`) before including them in error messages to prevent leaking sensitive query parameters or credentials.
 ## 2025-02-14 - Fix Uncaught Exception on Null JSON from OAuth Provider
 **Vulnerability:** A `TypeError` uncaught exception could occur if the JSON parsed from the OAuth Token Provider response was `null` (e.g. from a raw text body of "null") or a primitive, crashing the server because the code immediately tried to access `.access_token` on the result.
 **Learning:** `JSON.parse` does not always return an object. Valid JSON primitives like `"null"` parse to `null`, meaning property access will throw a fatal `TypeError`.
