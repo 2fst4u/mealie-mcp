@@ -13,6 +13,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 // Bundled snapshot lives at the package root (one level above src/ or dist/).
 const SNAPSHOT_PATH = join(here, "..", "openapi.snapshot.json");
 
+function safeUrl(urlStr: string): string {
+  try {
+    const parsed = new URL(urlStr);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return urlStr;
+  }
+}
+
 async function loadBundled(): Promise<OpenApiDocument> {
   const raw = await readFile(SNAPSHOT_PATH, "utf8");
   return JSON.parse(raw) as OpenApiDocument;
@@ -59,7 +68,7 @@ export async function loadOpenApi(config: Config): Promise<LoadedSpec> {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     process.stderr.write(
-      `[mealie-mcp] Could not fetch live spec from ${url} (${reason}); falling back to bundled snapshot.\n`,
+      `[mealie-mcp] Could not fetch live spec from ${safeUrl(url)} (${reason}); falling back to bundled snapshot.\n`,
     );
     return { doc: await loadBundled(), source: "bundled" };
   }

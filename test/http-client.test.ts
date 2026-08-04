@@ -696,7 +696,7 @@ test("handles network error", async () => {
     method: "get",
     path: "/api/test",
     pathParams: [],
-    queryParams: [],
+    queryParams: [{ name: "secret", isArray: false }],
     deprecated: false,
   };
 
@@ -704,9 +704,9 @@ test("handles network error", async () => {
     throw new Error("Network offline");
   });
 
-  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  const res = await executeTool(dummyConfig, tool, { secret: "xyz123" }, dummyAuth);
   assert.equal(res.isError, true);
-  assert.match((res.content[0] as {text: string}).text, /Network offline/);
+  assert.match((res.content[0] as {text: string}).text, /Request to GET https:\/\/api.example.com\/api\/test failed: Network offline/);
 });
 
 test("handles HTTP errors gracefully", async () => {

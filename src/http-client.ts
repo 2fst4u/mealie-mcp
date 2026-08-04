@@ -18,6 +18,15 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
+function safeUrl(urlStr: string): string {
+  try {
+    const parsed = new URL(urlStr);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return urlStr;
+  }
+}
+
 // `basename()` has already dropped the directory part, so this is not about
 // containment — the allowlist check in `readUpload` owns that. It is about not
 // forwarding a name Mealie has to cope with: control characters, quotes, and
@@ -392,7 +401,7 @@ async function executeWithRetry(
         continue;
       }
       debugLog(config, `${method} ${tool.path} → network error: ${reason}`);
-      return { content: [text(`Request to ${method} ${url} failed: ${reason}`)], isError: true };
+      return { content: [text(`Request to ${method} ${safeUrl(url)} failed: ${reason}`)], isError: true };
     }
 
     debugLog(config, `${method} ${tool.path} → ${res.status}`);
