@@ -248,3 +248,27 @@ test("clone deeply copies objects", () => {
   assert.notEqual(clonedWithArray.b, withArray.b);
   assert.notEqual(clonedWithArray.b.c, withArray.b.c);
 });
+
+// The guard these cover was added in response to a real prototype-pollution
+// finding (see .jules/sentinel.md, 2026-07-21). `clone` runs over schemas
+// parsed from a remote OpenAPI document, so a hostile `__proto__` key reaching
+// Object.prototype would poison every object in the process.
+test("clone drops keys that would pollute the prototype", () => {
+  const hostile = JSON.parse('{"a":1,"__proto__":{"polluted":true},"constructor":{"x":1},"prototype":{"y":1}}');
+
+  const cloned = clone(hostile) as Record<string, unknown>;
+
+  assert.deepEqual(Object.keys(cloned), ["a"]);
+  assert.equal(({} as Record<string, unknown>).polluted, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "__proto__"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "constructor"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(cloned, "prototype"), false);
+});
+
+test("clone leaves Object.prototype untouched for nested hostile keys", () => {
+  const hostile = JSON.parse('{"outer":{"__proto__":{"nested":true}}}');
+
+  clone(hostile);
+
+  assert.equal(({} as Record<string, unknown>).nested, undefined);
+});
