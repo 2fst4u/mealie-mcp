@@ -26,6 +26,25 @@ interface TokenResponse {
   expires_in?: number;
 }
 
+/**
+ * The token endpoint is named in every error this class throws, so strip
+ * anything sensitive the operator may have put in it: a query string, or
+ * `user:pass@` userinfo, which `origin` drops.
+ *
+ * Falls back to the raw value when it will not parse. Nothing validates
+ * MEALIE_OAUTH_TOKEN_URL as a URL, so a misconfigured one must still produce the
+ * "request failed" message that says what broke — not a bare ERR_INVALID_URL
+ * thrown out of the sanitizer, before the request is even attempted.
+ */
+function safeTokenUrl(tokenUrl: string): string {
+  try {
+    const parsed = new URL(tokenUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return tokenUrl;
+  }
+}
+
 class OAuthTokenProvider implements TokenProvider {
   private cached?: { header: string; expiresAt: number };
   /** In-flight fetch, shared so parallel tool calls don't stampede the token endpoint. */
@@ -63,9 +82,7 @@ class OAuthTokenProvider implements TokenProvider {
     let res: Response;
     let rawText: string;
 
-    // SECURITY: Sanitize tokenUrl for error messages to avoid leaking query parameters
-    const parsedUrl = new URL(this.oauth.tokenUrl);
-    const safeUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+    const safeUrl = safeTokenUrl(this.oauth.tokenUrl);
 
     try {
       res = await fetch(this.oauth.tokenUrl, {
