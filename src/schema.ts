@@ -8,7 +8,7 @@ export const COMPONENT_REF_PREFIX = "#/components/schemas/";
  * ⚡ Bolt: Custom recursive cloning avoids the heavy serialization overhead
  * of JSON.parse(JSON.stringify(...)), performing ~5x faster in tight loops.
  */
-function clone<T>(value: T): T {
+export function clone<T>(value: T): T {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) {
     const len = value.length;
