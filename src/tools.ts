@@ -105,7 +105,7 @@ function buildDescription(op: OpenApiOperation, path: string, method: string): s
 }
 
 /** Does a parameter schema permit an array value (so we repeat the query key)? */
-function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
+export function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
   if (!schema) return false;
   if (schema.type === "array") return true;
   for (const key of ["anyOf", "oneOf", "allOf"] as const) {
@@ -116,7 +116,7 @@ function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
 }
 
 /** Resolve a possibly-$ref'd schema to its target object (one hop) for inspection. */
-function resolveSchema(schema: JsonSchema | undefined, components: Record<string, JsonSchema>): JsonSchema | undefined {
+export function resolveSchema(schema: JsonSchema | undefined, components: Record<string, JsonSchema>): JsonSchema | undefined {
   if (!schema) return undefined;
   const ref = schema.$ref;
   if (typeof ref === "string" && ref.startsWith(COMPONENT_REF_PREFIX)) {
@@ -282,6 +282,22 @@ function collectOperations(
   return { entries, baseCounts };
 }
 
+function resolveToolName(
+  entry: RawEntry,
+  baseCounts: Record<string, number>,
+  usedNames: Set<string>,
+  nameMax: number,
+): string {
+  const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
+  let name = rawName;
+  for (let i = 2; usedNames.has(name); i++) {
+    const suffix = `_${i}`;
+    name = `${clampName(rawName, nameMax - suffix.length)}${suffix}`;
+  }
+  usedNames.add(name);
+  return name;
+}
+
 function buildTools(
   entries: RawEntry[],
   baseCounts: Record<string, number>,
@@ -292,13 +308,7 @@ function buildTools(
   const usedNames = new Set<string>();
   const defsCache = new Map<string, JsonSchema>();
   for (const entry of entries) {
-    const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
-    let name = rawName;
-    for (let i = 2; usedNames.has(name); i++) {
-      const suffix = `_${i}`;
-      name = `${clampName(rawName, nameMax - suffix.length)}${suffix}`;
-    }
-    usedNames.add(name);
+    const name = resolveToolName(entry, baseCounts, usedNames, nameMax);
 
     const { inputSchema, pathParams, queryParams } = buildInputSchema(
       entry.op,

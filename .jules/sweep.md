@@ -10,3 +10,6 @@
 ## 2026-08-16 - Unused Types/Interfaces Exposing Exports
 **Learning:** Similarly to unused constant exports, in TypeScript projects, internal types and interfaces (like `OperationBody` in `src/tools.ts`) might unnecessarily be exported, expanding the module's public surface area and triggering dead-code warnings from tools like `knip`.
 **Action:** Always verify if an exported type/interface is imported elsewhere. If it's isolated to local use, remove the `export` modifier to cleanly encapsulate it.
+## 2026-08-02 - Extract tool name resolution logic
+**Learning:** When dealing with duplicate name resolution loops, it is cleaner to extract the loop into a separate function that operates on the specific entry.
+**Action:** Extracted the name generation and loop logic from buildTools into a resolveToolName function.
