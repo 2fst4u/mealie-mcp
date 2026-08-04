@@ -335,31 +335,14 @@ async function performRequest(
   }
 }
 
-export async function executeTool(
+async function executeWithRetry(
   config: Config,
   tool: MealieTool,
-  args: Record<string, unknown>,
-  auth: TokenProvider,
+  url: string,
+  method: string,
+  maxAttempts: number,
+  send: (forceRefresh: boolean) => Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }>,
 ): Promise<ToolResult> {
-  const url = buildUrl(config, tool, args);
-
-  const baseHeaders: Record<string, string> = { Accept: "application/json" };
-  if (config.acceptLanguage) baseHeaders["Accept-Language"] = config.acceptLanguage;
-
-  const payload = await buildPayload(config, tool, args, baseHeaders);
-
-  const send = async (forceRefresh: boolean): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> => {
-    const headers = { ...baseHeaders };
-    const authValue = await auth.authHeader(forceRefresh);
-    if (authValue) headers.Authorization = authValue;
-
-    return performRequest(config, url, tool.method.toUpperCase(), headers, payload);
-  };
-
-  const method = tool.method.toUpperCase();
-  // Only GET is retried automatically: it is idempotent, so a repeat is safe.
-  const maxAttempts = tool.method === "get" ? (config.retries ?? 0) + 1 : 1;
-
   for (let attempt = 1; ; attempt++) {
     let res: Response;
     let bodyResult: { blocks: ContentBlock[]; raw: string };
@@ -401,4 +384,32 @@ export async function executeTool(
 
     return { content: blocks };
   }
+}
+
+export async function executeTool(
+  config: Config,
+  tool: MealieTool,
+  args: Record<string, unknown>,
+  auth: TokenProvider,
+): Promise<ToolResult> {
+  const url = buildUrl(config, tool, args);
+
+  const baseHeaders: Record<string, string> = { Accept: "application/json" };
+  if (config.acceptLanguage) baseHeaders["Accept-Language"] = config.acceptLanguage;
+
+  const payload = await buildPayload(config, tool, args, baseHeaders);
+
+  const send = async (forceRefresh: boolean): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> => {
+    const headers = { ...baseHeaders };
+    const authValue = await auth.authHeader(forceRefresh);
+    if (authValue) headers.Authorization = authValue;
+
+    return performRequest(config, url, tool.method.toUpperCase(), headers, payload);
+  };
+
+  const method = tool.method.toUpperCase();
+  // Only GET is retried automatically: it is idempotent, so a repeat is safe.
+  const maxAttempts = tool.method === "get" ? (config.retries ?? 0) + 1 : 1;
+
+  return executeWithRetry(config, tool, url, method, maxAttempts, send);
 }
