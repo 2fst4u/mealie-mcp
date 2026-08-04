@@ -110,7 +110,16 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
     path = path.replace(`{${name}}`, encodeURIComponent(String(value)));
   }
 
-  const url = new URL(path.replace(/^\/+/, ""), config.baseUrl + "/");
+  // Resolve against the base rather than concatenating. `baseUrl + path` lets a
+  // spec-supplied path beginning with `@` reparse the host: "https://mealie.example"
+  // + "@evil.com/x" is a URL whose host is evil.com. The two-argument form cannot
+  // be steered that way.
+  //
+  // Both sides need adjusting for that form to preserve a base with a subpath:
+  // the base must end in `/` or its last segment is dropped, and the path must
+  // not start with `/` or it resolves against the origin and drops the subpath.
+  const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+  const url = new URL(path.replace(/^\/+/, ""), base);
   for (const { name } of tool.queryParams) {
     const value = args[name];
     if (value === undefined || value === null) continue;
