@@ -115,12 +115,12 @@ test("gracefully falls back to the bundled spec if the fetch promise rejects (e.
   const fetchStub = stubFetch([{ status: -1, body: "" }]);
   const stderrStub = stubStderr();
   try {
-    const result = await loadOpenApi(makeConfig());
+    const result = await loadOpenApi(makeConfig({ openapiUrl: "https://mealie.example.com/openapi.json?secret=123" }));
     assert.equal(result.source, "bundled");
     assert.ok(result.doc.paths, "should contain paths object");
     assert.equal(fetchStub.calls.length, 1);
     assert.equal(stderrStub.logs.length, 1);
-    assert.match(stderrStub.logs[0], /Could not fetch live spec/);
+    assert.match(stderrStub.logs[0], /Could not fetch live spec from https:\/\/mealie.example.com\/openapi.json \(/);
     assert.match(stderrStub.logs[0], /Network error/);
   } finally {
     fetchStub.restore();

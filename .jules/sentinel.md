@@ -66,3 +66,7 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** A `TypeError` uncaught exception could occur if the JSON parsed from the OAuth Token Provider response was `null` (e.g. from a raw text body of "null") or a primitive, crashing the server because the code immediately tried to access `.access_token` on the result.
 **Learning:** `JSON.parse` does not always return an object. Valid JSON primitives like `"null"` parse to `null`, meaning property access will throw a fatal `TypeError`.
 **Prevention:** Always check that the parsed JSON result is a truthy object (e.g. `!parsed || typeof parsed !== 'object'`) before accessing properties on it when handling external or untrusted data sources.
+## 2025-01-20 - URL Query String Information Disclosure in Error Messages
+**Vulnerability:** When a network request to an external API (like fetching an OpenAPI spec or making a tool call) failed, the original complete URL (including sensitive query parameters or basic auth) was included in the error message returned to the user or logged to stderr.
+**Learning:** Exposing external URLs directly in error messages can inadvertently leak sensitive information, such as API keys passed via query parameters or basic authentication credentials included in the URL string.
+**Prevention:** Always sanitize external URLs before including them in logs or error messages by parsing them via `new URL()` and extracting only the `origin` and `pathname`, explicitly excluding query parameters, hashes, and authentication info.
