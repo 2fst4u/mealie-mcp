@@ -1,6 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, list } from "../src/config.js";
+import { loadConfig, bool, list } from "../src/config.js";
+
+test("bool function parses truthy values correctly", () => {
+  assert.equal(bool("1"), true);
+  assert.equal(bool("true"), true);
+  assert.equal(bool("yes"), true);
+  assert.equal(bool("on"), true);
+});
+
+test("bool function handles case-insensitivity and whitespace", () => {
+  assert.equal(bool(" TRUE "), true);
+  assert.equal(bool("YeS"), true);
+  assert.equal(bool("\t1\n"), true);
+});
+
+test("bool function parses falsy values correctly", () => {
+  assert.equal(bool("0"), false);
+  assert.equal(bool("false"), false);
+  assert.equal(bool("no"), false);
+  assert.equal(bool("off"), false);
+  assert.equal(bool(""), false);
+  assert.equal(bool("random string"), false);
+});
+
+test("bool function handles undefined values with fallbacks", () => {
+  assert.equal(bool(undefined), false);
+  assert.equal(bool(undefined, true), true);
+  assert.equal(bool(undefined, false), false);
+});
 
 test("throws when MEALIE_BASE_URL is missing", () => {
   assert.throws(() => loadConfig({} as NodeJS.ProcessEnv), /MEALIE_BASE_URL is required/);
