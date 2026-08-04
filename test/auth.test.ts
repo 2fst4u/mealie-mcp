@@ -77,6 +77,16 @@ test("OAuth provider surfaces a clear error when token response is invalid JSON"
   }
 });
 
+test("OAuth provider surfaces a clear error when token response is null JSON", async () => {
+  const fetchStub = stubFetch([{ status: 200, body: "null" }]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(() => provider.authHeader(), /OAuth token response from https:\/\/idp\.example\.com\/token did not include an access_token\./);
+  } finally {
+    fetchStub.restore();
+  }
+});
+
 test("OAuth provider caches the token within its lifetime", async () => {
   const fetchStub = stubFetch([{ body: { access_token: "abc", expires_in: 3600 } }]);
   try {

@@ -66,12 +66,12 @@ export const DEFAULT_TOOL_NAME_MAX = 50;
 const DEFAULT_RETRIES = 2;
 const MAX_RETRIES = 5;
 
-function bool(value: string | undefined, fallback = false): boolean {
+export function bool(value: string | undefined, fallback = false): boolean {
   if (value === undefined) return fallback;
   return /^(1|true|yes|on)$/i.test(value.trim());
 }
 
-function list(value: string | undefined): string[] {
+export function list(value: string | undefined): string[] {
   if (!value) return [];
   return value
     .split(",")
