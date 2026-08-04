@@ -1,6 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig } from "../src/config.js";
+import { loadConfig, bool, list } from "../src/config.js";
+
+test("bool function parses truthy values correctly", () => {
+  assert.equal(bool("1"), true);
+  assert.equal(bool("true"), true);
+  assert.equal(bool("yes"), true);
+  assert.equal(bool("on"), true);
+});
+
+test("bool function handles case-insensitivity and whitespace", () => {
+  assert.equal(bool(" TRUE "), true);
+  assert.equal(bool("YeS"), true);
+  assert.equal(bool("\t1\n"), true);
+});
+
+test("bool function parses falsy values correctly", () => {
+  assert.equal(bool("0"), false);
+  assert.equal(bool("false"), false);
+  assert.equal(bool("no"), false);
+  assert.equal(bool("off"), false);
+  assert.equal(bool(""), false);
+  assert.equal(bool("random string"), false);
+});
+
+test("bool function handles undefined values with fallbacks", () => {
+  assert.equal(bool(undefined), false);
+  assert.equal(bool(undefined, true), true);
+  assert.equal(bool(undefined, false), false);
+});
 
 test("throws when MEALIE_BASE_URL is missing", () => {
   assert.throws(() => loadConfig({} as NodeJS.ProcessEnv), /MEALIE_BASE_URL is required/);
@@ -125,4 +153,13 @@ test("parses the upload allowlist and defaults to empty", () => {
     MEALIE_ALLOWED_UPLOAD_DIRS: " /srv/uploads , /home/me/pics ,",
   } as NodeJS.ProcessEnv);
   assert.deepEqual(set.allowedUploadDirs, ["/srv/uploads", "/home/me/pics"]);
+});
+
+test("config list parser behaves correctly on all edge cases", () => {
+  assert.deepEqual(list(undefined), []);
+  assert.deepEqual(list(""), []);
+  assert.deepEqual(list("foo"), ["foo"]);
+  assert.deepEqual(list("foo,bar"), ["foo", "bar"]);
+  assert.deepEqual(list(" foo , bar "), ["foo", "bar"]);
+  assert.deepEqual(list("foo,,bar,"), ["foo", "bar"]);
 });

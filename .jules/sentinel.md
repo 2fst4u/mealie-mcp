@@ -54,3 +54,7 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** Logging raw external URLs in error messages can leak sensitive information like query parameters or inline credentials.
 **Learning:** Constructing a sanitized URL from `new URL(url).origin` and `pathname` ensures potentially sensitive query strings or fragments are safely stripped out.
 **Prevention:** Sanitize external URLs (e.g., extracting only the origin and pathname via `new URL()`) before including them in error messages to prevent leaking sensitive query parameters or credentials.
+## 2025-02-14 - Fix Uncaught Exception on Null JSON from OAuth Provider
+**Vulnerability:** A `TypeError` uncaught exception could occur if the JSON parsed from the OAuth Token Provider response was `null` (e.g. from a raw text body of "null") or a primitive, crashing the server because the code immediately tried to access `.access_token` on the result.
+**Learning:** `JSON.parse` does not always return an object. Valid JSON primitives like `"null"` parse to `null`, meaning property access will throw a fatal `TypeError`.
+**Prevention:** Always check that the parsed JSON result is a truthy object (e.g. `!parsed || typeof parsed !== 'object'`) before accessing properties on it when handling external or untrusted data sources.

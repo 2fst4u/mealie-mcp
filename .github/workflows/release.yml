@@ -107,29 +107,72 @@ jobs:
             npm publish --access public
           fi
 
-      # Persist the bump: commit package.json + lockfile and tag the release,
-      # then push both back to main. Pushes made with GITHUB_TOKEN do not trigger
-      # new workflow runs, and `[skip ci]` is belt-and-suspenders, so this does
-      # not start a release loop.
-      - name: Commit, tag & push
+      # Persist the release in two independent steps, tag first.
+      #
+      # These used to be one step that committed the bump, rebased it onto the
+      # latest main, then tagged and pushed both together. The rebase was there
+      # to survive a burst of PR merges queuing several releases, but it cannot:
+      # our bump commit and the bump commit of the release ahead of us edit the
+      # same "version" line in package.json and package-lock.json, so rebasing
+      # one onto the other conflicts every single time. Because the tag was
+      # created after the rebase, that conflict took the tag down with it — and
+      # the publish had already happened. That is exactly how v0.2.44 reached
+      # npm with no tag and no GitHub release behind it.
+      #
+      # Tagging first fixes the ordering: the tag is the durable record (the
+      # next version is derived from it), it cannot race anything because
+      # versions are unique, and it names the commit that was actually built and
+      # published rather than a bookkeeping commit created afterwards.
+      - name: Tag the released commit
         env:
           VERSION: ${{ steps.bump.outputs.version }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(release): v$VERSION [skip ci]"
-          # main may have advanced while this release ran (e.g. a burst of PR
-          # merges queuing several releases). Rebase our single [skip ci] bump
-          # commit onto the latest main so the push is a fast-forward instead of
-          # being rejected — the tag is already computed to be unique, so runs
-          # never fight over it. Tag *after* the rebase so the annotated tag
-          # points at the commit that actually lands on main.
-          git pull --rebase origin main
-          # Annotated tag + explicit push: `--follow-tags` only pushes annotated
-          # tags, and the GitHub release step needs the tag on the remote.
-          git tag -a "$TAG" -m "v$VERSION"
-          git push origin HEAD:main "$TAG"
+          # Annotated: the GitHub release step needs the tag on the remote, and
+          # `--follow-tags` only ever pushes annotated tags.
+          git tag -a "$TAG" -m "v$VERSION" "$GITHUB_SHA"
+          git push origin "$TAG"
+
+      # Record the bump on main. Pushes made with GITHUB_TOKEN do not trigger new
+      # workflow runs, and `[skip ci]` is belt-and-suspenders, so this does not
+      # start a release loop.
+      - name: Push version bump to main
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          # Re-apply the bump onto whatever main is *now* on each attempt, rather
+          # than carrying a commit that has to be rebased past someone else's
+          # edit to the same lines. Reapplying cannot conflict: we take main's
+          # files verbatim and set one field.
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git reset -q --hard origin/main
+
+            CURRENT=$(node -p "require('./package.json').version")
+            HIGHEST=$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | tail -n1)
+            if [ "$CURRENT" = "$VERSION" ] || [ "$HIGHEST" != "$VERSION" ]; then
+              # A newer release won the race and already bumped main. Writing
+              # ours now would walk main's version backwards.
+              echo "::notice::main is at v$CURRENT; leaving it rather than writing v$VERSION over it."
+              exit 0
+            fi
+
+            npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
+            git commit -aqm "chore(release): v$VERSION [skip ci]"
+            if git push -q origin HEAD:main; then
+              exit 0
+            fi
+            echo "::notice::main moved while pushing the bump; retrying ($attempt/3)."
+          done
+
+          # Deliberately not a failure. The tag and the npm publish have both
+          # already succeeded, so the release itself is intact and complete; the
+          # version on main is a lagging convenience that the next release
+          # rewrites anyway. Failing here would red-flag a release that shipped
+          # correctly.
+          echo "::warning::Could not push the v$VERSION bump to main after 3 attempts. The tag and the npm publish both succeeded; main's package.json will catch up on the next release."
 
       - name: Create GitHub release
         env:
