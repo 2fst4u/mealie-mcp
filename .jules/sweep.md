@@ -7,3 +7,6 @@
 ## 2026-08-01 - Explicit return types on multi-field helper functions
 **Learning:** Helpers like `processParams` in `src/tools.ts` return a five-field object that callers destructure. Relying on inference leaves the contract implicit, so an accidental rename or dropped field only surfaces at the call site rather than at the function itself.
 **Action:** Annotate the return type explicitly on helpers whose result shape is part of their contract, so the compiler pins the shape where it is defined.
+## 2026-08-02 - Extract tool name resolution logic
+**Learning:** When dealing with duplicate name resolution loops, it is cleaner to extract the loop into a separate function that operates on the specific entry.
+**Action:** Extracted the name generation and loop logic from buildTools into a resolveToolName function.
