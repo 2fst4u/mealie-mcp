@@ -41,8 +41,7 @@ function collectRefs(
   seen: Set<string>,
 ): void {
   if (Array.isArray(node)) {
-    // ⚡ Bolt: Using a standard for-loop avoids allocating an iterator on every recursive call.
-    for (let i = 0; i < node.length; i++) collectRefs(node[i], components, seen);
+    for (const item of node) collectRefs(item, components, seen);
     return;
   }
   if (!node || typeof node !== "object") return;
@@ -68,7 +67,7 @@ function collectRefs(
 /** Rewrite `#/components/schemas/X` refs to local `#/$defs/X` refs (in place). */
 function rewriteRefs(node: unknown): void {
   if (Array.isArray(node)) {
-    for (let i = 0; i < node.length; i++) rewriteRefs(node[i]);
+    for (const item of node) rewriteRefs(item);
     return;
   }
   if (!node || typeof node !== "object") return;

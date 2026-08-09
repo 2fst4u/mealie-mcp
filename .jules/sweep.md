@@ -14,3 +14,6 @@
 **Learning:** When dealing with duplicate name resolution loops, it is cleaner to extract the loop into a separate function that operates on the specific entry.
 **Action:** Extracted the name generation and loop logic from buildTools into a resolveToolName function.
 ## 2024-05-18 - Avoid repeated array iterations in tool filtering\n\n**What:** Refactored `FilterCondition` to use a single object `FilterConditions` containing a `Set` for exact string matches (which provides O(1) lookups) and a string array for prefix matches.\n**Why:** During filter evaluation, `matches()` was continually iterating over every user-specified condition. Consolidating the conditions into a single Set prevents repeating the loop structure for exact matches, leading to better readability and potentially slight performance improvements for setups with large include/exclude lists.
+## 2026-08-09 - Code Health: Use for...of for clean array iteration
+**Learning:**
+Code health convention: Prefer `for...of` loops for simple array iteration to improve readability, as modern JS engines highly optimize them. Retain index-based `for` loops primarily when assigning to pre-allocated arrays in performance-critical paths (e.g., recursive cloning) where explicit indexing is necessary.
