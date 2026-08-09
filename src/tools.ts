@@ -298,6 +298,40 @@ function resolveToolName(
   return name;
 }
 
+function buildTool(
+  entry: RawEntry,
+  baseCounts: Record<string, number>,
+  usedNames: Set<string>,
+  components: Record<string, JsonSchema>,
+  defsCache: Map<string, JsonSchema>,
+  nameMax: number,
+): MealieTool {
+  const name = resolveToolName(entry, baseCounts, usedNames, nameMax);
+
+  const { inputSchema, pathParams, queryParams } = buildInputSchema(
+    entry.op,
+    entry.params,
+    entry.body,
+    components,
+    defsCache,
+  );
+
+  return {
+    name,
+    description: buildDescription(entry.op, entry.path, entry.method),
+    inputSchema,
+    category: entry.category,
+    method: entry.method,
+    path: entry.path,
+    pathParams,
+    queryParams,
+    body: entry.body
+      ? { kind: entry.body.kind, required: entry.body.required, fileFields: entry.body.fileFields }
+      : undefined,
+    deprecated: Boolean(entry.op.deprecated),
+  };
+}
+
 function buildTools(
   entries: RawEntry[],
   baseCounts: Record<string, number>,
@@ -308,30 +342,7 @@ function buildTools(
   const usedNames = new Set<string>();
   const defsCache = new Map<string, JsonSchema>();
   for (const entry of entries) {
-    const name = resolveToolName(entry, baseCounts, usedNames, nameMax);
-
-    const { inputSchema, pathParams, queryParams } = buildInputSchema(
-      entry.op,
-      entry.params,
-      entry.body,
-      components,
-      defsCache,
-    );
-
-    tools.push({
-      name,
-      description: buildDescription(entry.op, entry.path, entry.method),
-      inputSchema,
-      category: entry.category,
-      method: entry.method,
-      path: entry.path,
-      pathParams,
-      queryParams,
-      body: entry.body
-        ? { kind: entry.body.kind, required: entry.body.required, fileFields: entry.body.fileFields }
-        : undefined,
-      deprecated: Boolean(entry.op.deprecated),
-    });
+    tools.push(buildTool(entry, baseCounts, usedNames, components, defsCache, nameMax));
   }
 
   return tools;
