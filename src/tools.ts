@@ -349,28 +349,30 @@ export function generateTools(doc: OpenApiDocument, nameMax: number = DEFAULT_TO
   return buildTools(entries, baseCounts, components, nameMax);
 }
 
-type FilterCondition = { exact: string; prefix: string };
+type FilterConditions = { exact: Set<string>; prefixes: string[] };
 
 /**
  * ⚡ Bolt: Precomputing the exact lowercase and prefix match strings avoids
  * repeatedly calling `toLowerCase()` and allocating template strings for
  * every filter rule against every generated tool during initialization.
  */
-function buildConditions(entries: string[]): FilterCondition[] {
-  return entries.map((e) => {
-    const exact = e.toLowerCase();
-    return { exact, prefix: `${exact}_` };
-  });
+function buildConditions(entries: string[]): FilterConditions {
+  const exact = new Set<string>();
+  const prefixes: string[] = [];
+  for (const e of entries) {
+    const lower = e.toLowerCase();
+    exact.add(lower);
+    prefixes.push(`${lower}_`);
+  }
+  return { exact, prefixes };
 }
 
-function matches(tool: MealieTool, conditions: FilterCondition[]): boolean {
-  for (const c of conditions) {
-    if (
-      tool.name === c.exact ||
-      tool.name.startsWith(c.prefix) ||
-      tool.category === c.exact ||
-      tool.category.startsWith(c.prefix)
-    ) {
+function matches(tool: MealieTool, conditions: FilterConditions): boolean {
+  if (conditions.exact.has(tool.name) || conditions.exact.has(tool.category)) {
+    return true;
+  }
+  for (const prefix of conditions.prefixes) {
+    if (tool.name.startsWith(prefix) || tool.category.startsWith(prefix)) {
       return true;
     }
   }
@@ -418,15 +420,15 @@ export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
   // ever subtract from it, never add a hard-excluded tool back.
   const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
   const hasInclude = config.include.length > 0;
-  const includeConditions = hasInclude ? buildConditions(config.include) : [];
+  const includeConditions = hasInclude ? buildConditions(config.include) : null;
   const hasExclude = config.exclude.length > 0;
-  const excludeConditions = hasExclude ? buildConditions(config.exclude) : [];
+  const excludeConditions = hasExclude ? buildConditions(config.exclude) : null;
 
   return tools.filter((t) => {
     if (matches(t, hardExcludeConditions)) return false;
     if (config.readOnly && t.method !== "get") return false;
-    if (hasInclude && !matches(t, includeConditions)) return false;
-    if (hasExclude && matches(t, excludeConditions)) return false;
+    if (includeConditions && !matches(t, includeConditions)) return false;
+    if (excludeConditions && matches(t, excludeConditions)) return false;
     return true;
   });
 }
