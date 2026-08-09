@@ -41,7 +41,7 @@ function safeTokenUrl(tokenUrl: string): string {
     const parsed = new URL(tokenUrl);
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
-    return tokenUrl;
+    return "<invalid url>";
   }
 }
 

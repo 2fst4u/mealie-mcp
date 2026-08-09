@@ -184,3 +184,13 @@ test("isRefreshable is true only for OAuth", () => {
   assert.equal(isRefreshable(makeConfig({ token: "static" })), false);
   assert.equal(isRefreshable(makeConfig()), false);
 });
+
+test("OAuth provider masks invalid token URL in error messages", async () => {
+  const fetchStub = stubFetch([{ status: -1, body: "" }]);
+  try {
+    const provider = createTokenProvider(oauthConfig({ oauth: { tokenUrl: "not-a-valid-url", clientId: "id", clientSecret: "secret", scope: "mealie", audience: "aud" } }));
+    await assert.rejects(() => provider.authHeader(), /OAuth token request to <invalid url> failed:/);
+  } finally {
+    fetchStub.restore();
+  }
+});
