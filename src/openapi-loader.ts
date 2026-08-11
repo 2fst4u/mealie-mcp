@@ -18,7 +18,7 @@ function safeUrl(urlStr: string): string {
     const parsed = new URL(urlStr);
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
-    return urlStr;
+    return "<invalid url>";
   }
 }
 
