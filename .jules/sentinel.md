@@ -70,3 +70,8 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** When a network request to an external API (like fetching an OpenAPI spec or making a tool call) failed, the original complete URL (including sensitive query parameters or basic auth) was included in the error message returned to the user or logged to stderr.
 **Learning:** Exposing external URLs directly in error messages can inadvertently leak sensitive information, such as API keys passed via query parameters or basic authentication credentials included in the URL string.
 **Prevention:** Always sanitize external URLs before including them in logs or error messages by parsing them via `new URL()` and extracting only the `origin` and `pathname`, explicitly excluding query parameters, hashes, and authentication info.
+
+## 2025-02-23 - URL Query String Information Disclosure in Error Messages Fallback
+**Vulnerability:** When a URL fails to parse via `new URL()` (e.g. malformed or invalid structure), the fallback mechanism in `safeUrl` returned the original un-sanitized string. If this malformed URL contained sensitive query parameters or inline credentials (e.g., `invalid-url?secret=123`), the fallback would leak them into logs or error messages.
+**Learning:** Returning the raw input when sanitization fails defeats the purpose of the sanitization function, as attackers or configuration errors can result in invalid formats that still contain secrets.
+**Prevention:** If URL sanitization fails to parse the string, it must fail securely by returning a generic placeholder (like `"<invalid url>"`) rather than echoing the potentially sensitive raw input back to the user or logs.
