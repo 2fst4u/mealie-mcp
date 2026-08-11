@@ -132,6 +132,13 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
   // not start with `/` or it resolves against the origin and drops the subpath.
   const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
   const url = new URL(path.replace(/^\/+/, ""), base);
+
+  // SECURITY: Assert that the generated URL origin strictly matches the base origin
+  // to prevent Server-Side Request Forgery (SSRF) via protocol-relative paths or absolute URLs.
+  if (url.origin !== new URL(base).origin) {
+    throw new Error("SSRF attack detected: URL origin mismatch");
+  }
+
   for (const { name } of tool.queryParams) {
     const value = args[name];
     if (value === undefined || value === null) continue;
