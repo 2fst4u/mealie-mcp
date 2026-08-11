@@ -41,6 +41,7 @@ function safeTokenUrl(tokenUrl: string): string {
     const parsed = new URL(tokenUrl);
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
+    // SECURITY: Do not return the raw tokenUrl here, as it may contain sensitive credentials
     return "<invalid url>";
   }
 }

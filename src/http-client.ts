@@ -23,6 +23,7 @@ function safeUrl(urlStr: string): string {
     const parsed = new URL(urlStr);
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
+    // SECURITY: Do not return the raw urlStr here, as it may contain sensitive credentials
     return "<invalid url>";
   }
 }
