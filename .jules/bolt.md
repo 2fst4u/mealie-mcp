@@ -76,3 +76,6 @@ effect to record.
 ## 2025-08-05 - Avoid intermediate array allocations in Map and Set initialization
 **Learning:** `new Map(arr.map(...))` and `new Set(arr.map(...))` allocate temporary arrays (and in the case of Map, temporary tuples) that are immediately discarded by the constructor, causing unnecessary GC churn. This was verified with `perf_hooks`.
 **Action:** Replace `new Map(arr.map(...))` with a `for...of` loop and `Map.set()`, and `new Set(arr.map(...))` with a `for...of` loop and `Set.add()` in initialization paths.
+## 2026-08-12 - Optimize multipart request building
+**Learning:** Instantiating new `Set` instances for `fileFields` on every `buildMultipart` request adds unnecessary allocation overhead, especially since `fileFields` is static per tool. Additionally, sequentially reading and resolving paths for multiple uploaded files introduces unnecessary blocking I/O.
+**Action:** Precompute static sets during initialization (e.g., in `buildTool`) and store them on the internal object definition. Use `Promise.all` combined with synchronous closures (`() => void`) to parallelize I/O operations while still safely preserving the append order of the resolved values into ordered structures like `FormData`.

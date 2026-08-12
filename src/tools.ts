@@ -37,6 +37,8 @@ export interface MealieTool {
     fileFields: string[];
   };
   deprecated: boolean;
+  /** Internal precomputed set of fileFields to avoid allocating Set instances repeatedly. */
+  _fileFieldsSet?: Set<string>;
 }
 
 function slug(value: string): string {
@@ -329,6 +331,7 @@ function buildTool(
       ? { kind: entry.body.kind, required: entry.body.required, fileFields: entry.body.fileFields }
       : undefined,
     deprecated: Boolean(entry.op.deprecated),
+    _fileFieldsSet: entry.body ? new Set(entry.body.fileFields) : undefined,
   };
 }
 
