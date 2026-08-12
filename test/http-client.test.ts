@@ -852,6 +852,36 @@ test("empty error body does not report Success", async () => {
   assert.doesNotMatch(txt, /Success/);
   assert.match(txt, /HTTP 404 Not Found/);
 });
+test("refuses to execute if path spoofing changes the URL origin (SSRF)", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "https://evil.com/api/data",
+    pathParams: [],
+    queryParams: [],
+    body: undefined,
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    throw new Error("Should not be called");
+  });
+
+  await assert.rejects(
+    executeTool(dummyConfig, tool, {}, dummyAuth),
+    /SSRF attack detected: URL origin mismatch/
+  );
+
+  tool.path = "http://evil.com/api/data";
+  await assert.rejects(
+    executeTool(dummyConfig, tool, {}, dummyAuth),
+    /SSRF attack detected: URL origin mismatch/
+  );
+});
+
 test("securely constructs URLs to prevent host-spoofing", async () => {
   const tool: MealieTool = {
     name: "test_tool",

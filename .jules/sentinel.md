@@ -75,3 +75,19 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Vulnerability:** When a URL fails to parse via `new URL()` (e.g. malformed or invalid structure), the fallback mechanism in `safeUrl` returned the original un-sanitized string. If this malformed URL contained sensitive query parameters or inline credentials (e.g., `invalid-url?secret=123`), the fallback would leak them into logs or error messages.
 **Learning:** Returning the raw input when sanitization fails defeats the purpose of the sanitization function, as attackers or configuration errors can result in invalid formats that still contain secrets.
 **Prevention:** If URL sanitization fails to parse the string, it must fail securely by returning a generic placeholder (like `"<invalid url>"`) rather than echoing the potentially sensitive raw input back to the user or logs.
+## 2025-02-14 - Fix SSRF via OpenAPI Path Injection
+
+**Vulnerability:**
+The HTTP client constructed request URLs by passing an untrusted OpenAPI path into `new URL(path, base)`. The Node.js URL constructor resolves absolute URLs (e.g. `https://evil.com/api`) and protocol-relative URLs (e.g. `//evil.com/api`) by dropping the origin from the `base` entirely. This caused Server-Side Request Forgery (SSRF) and host spoofing, allowing an attacker or an AI model to redirect HTTP requests to arbitrary domains.
+
+**Learning:**
+When safely constructing URLs by combining a base URL and a relative path using `new URL(path, base)`, ensuring the base URL ends with a trailing slash and removing leading slashes from the path is not enough to secure the constructed URL. If the input path can be an absolute or protocol-relative URL, it will silently override the base origin.
+
+**Prevention:**
+To prevent SSRF and ensure the requested endpoint remains locked to the correct base API server, always assert that the origin of the fully constructed URL strictly matches the base URL's origin:
+```typescript
+const url = new URL(path, base);
+if (url.origin !== new URL(base).origin) {
+  throw new Error("SSRF attack detected: URL origin mismatch");
+}
+```
