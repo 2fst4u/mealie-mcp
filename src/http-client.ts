@@ -251,25 +251,40 @@ async function buildMultipart(
   body: Record<string, unknown>,
 ): Promise<FormData> {
   const form = new FormData();
-  const fileFields = new Set(tool.body?.fileFields ?? []);
+  const fileFields = tool._fileFieldsSet ?? new Set(tool.body?.fileFields ?? []);
   // SECURITY: Fail closed. If no upload directories are explicitly allowed,
   // uploads are refused to prevent arbitrary local file reads.
   const allowedDirs = await resolveAllowedDirs(config.allowedUploadDirs);
 
-  for (const [key, value] of Object.entries(body)) {
-    if (value === undefined || value === null) continue;
-    if (fileFields.has(key)) {
-      const paths = Array.isArray(value) ? value : [value];
-      const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
-      for (const { filePath, blob } of files) {
-        form.append(key, blob, sanitizeFilename(basename(filePath)));
+  // ⚡ Bolt: Process files concurrently to overlap I/O latency, but return
+  // synchronous closures to execute sequentially and preserve append order.
+  const operations = await Promise.all(
+    Object.entries(body).map(async ([key, value]) => {
+      if (value === undefined || value === null) return () => {};
+      if (fileFields.has(key)) {
+        const paths = Array.isArray(value) ? value : [value];
+        const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
+        return () => {
+          for (const { filePath, blob } of files) {
+            form.append(key, blob, sanitizeFilename(basename(filePath)));
+          }
+        };
+      } else if (Array.isArray(value)) {
+        return () => {
+          for (const item of value) form.append(key, scalar(item));
+        };
+      } else {
+        return () => {
+          form.append(key, scalar(value));
+        };
       }
-    } else if (Array.isArray(value)) {
-      for (const item of value) form.append(key, scalar(item));
-    } else {
-      form.append(key, scalar(value));
-    }
+    })
+  );
+
+  for (const apply of operations) {
+    apply();
   }
+
   return form;
 }
 
