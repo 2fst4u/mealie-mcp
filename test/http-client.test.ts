@@ -882,6 +882,30 @@ test("refuses to execute if path spoofing changes the URL origin (SSRF)", async 
   );
 });
 
+test("refuses to execute if malicious path parameter causes SSRF", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "https://{test}",
+    pathParams: ["test"],
+    queryParams: [],
+    body: undefined,
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    throw new Error("Should not be called");
+  });
+
+  await assert.rejects(
+    executeTool(dummyConfig, tool, { test: "evil.com" }, dummyAuth),
+    /SSRF attack detected: URL origin mismatch/
+  );
+});
+
 test("securely constructs URLs to prevent host-spoofing", async () => {
   const tool: MealieTool = {
     name: "test_tool",
