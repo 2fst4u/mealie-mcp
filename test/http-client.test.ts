@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeTool } from "../src/http-client.js";
+import { executeTool, safeUrl } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 import type { TokenProvider } from "../src/auth.js";
@@ -955,4 +955,23 @@ test("preserves config.baseUrl subpaths when constructing URLs", async () => {
   await executeTool(subpathConfig, tool, {}, dummyAuth);
 
   assert.equal(capturedUrl, "https://api.example.com/mealie-subpath/api/data");
+});
+
+test("safeUrl securely strips credentials from valid URLs", () => {
+  const url = "https://user:pass@example.com/api/data?query=123#hash";
+  const safe = safeUrl(url);
+  assert.equal(safe, "https://example.com/api/data");
+});
+
+test("safeUrl returns <invalid url> for unparseable strings", () => {
+  const invalidStrs = [
+    "not-a-url",
+    "http://",
+    "",
+    "   ",
+  ];
+  for (const str of invalidStrs) {
+    const safe = safeUrl(str);
+    assert.equal(safe, "<invalid url>");
+  }
 });
