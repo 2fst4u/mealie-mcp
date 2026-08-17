@@ -18,7 +18,7 @@ export interface ToolResult {
 
 const MAX_TEXT = 100_000;
 
-function safeUrl(urlStr: string): string {
+export function safeUrl(urlStr: string): string {
   try {
     const parsed = new URL(urlStr);
     return `${parsed.origin}${parsed.pathname}`;
