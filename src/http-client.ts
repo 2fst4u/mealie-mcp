@@ -194,10 +194,10 @@ async function readUpload(
   try {
     realPath = await realpath(filePath);
   } catch (err) {
-    // Paths here come from a model, so a bare ENOENT/EACCES is worth restating
-    // in terms of the upload it broke.
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Upload failed: cannot read ${filePath} (${reason}).`);
+    // SECURITY: Sensitive Data Exposure. Omit the exact filesystem error message (ENOENT/EACCES)
+    // from the error thrown here so it does not leak into the model's response.
+    // We only state that the upload broke.
+    throw new Error(`Upload failed: cannot read ${filePath}.`);
   }
 
   if (!allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {

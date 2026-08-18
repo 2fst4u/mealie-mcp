@@ -351,10 +351,10 @@ test("uploads every file when a file field holds an array of paths", async () =>
   );
 });
 
-test("reports an unreadable upload path instead of a bare filesystem error", async () => {
+test("reports an unreadable upload path instead of a bare filesystem error without leaking sensitive info", async () => {
   await assert.rejects(
     () => executeTool(dummyConfig, uploadTool, { body: { image: "/definitely/not/here.png" } }, dummyAuth),
-    /Upload failed: cannot read \/definitely\/not\/here\.png/,
+    /Upload failed: cannot read \/definitely\/not\/here\.png\.$/,
   );
 });
 

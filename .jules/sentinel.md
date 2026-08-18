@@ -91,3 +91,7 @@ if (url.origin !== new URL(base).origin) {
   throw new Error("SSRF attack detected: URL origin mismatch");
 }
 ```
+## 2026-08-18 - Prevent Filesystem Error Leakage
+**Vulnerability:** Sensitive Data Exposure via raw filesystem error messages (e.g., ENOENT, EACCES) being leaked to the model when file operations fail.
+**Learning:** Raw filesystem errors expose internal system structure and paths which can aid attackers in reconnaissance or path traversal attempts.
+**Prevention:** Catch filesystem errors and replace them with generic, safe error messages that do not expose the underlying system reason. Document this with a `// SECURITY:` comment.
