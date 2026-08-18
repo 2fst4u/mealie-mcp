@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeTool, safeUrl } from "../src/http-client.js";
+import { executeTool, safeUrl, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 import type { TokenProvider } from "../src/auth.js";
@@ -974,4 +974,16 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
     const safe = safeUrl(str);
     assert.equal(safe, "<invalid url>");
   }
+});
+
+test("resolveAllowedDirs drops non-existent paths", async () => {
+  const dirs = await resolveAllowedDirs(["/path/does/not/exist/12345", "/another/bad/path"]);
+  assert.deepEqual(dirs, []);
+});
+
+test("resolveAllowedDirs resolves and appends separator to valid paths", async () => {
+  const osTempDir = tmpdir();
+  const dirs = await resolveAllowedDirs([osTempDir, "/path/does/not/exist/12345"]);
+  assert.equal(dirs.length, 1);
+  assert.ok(dirs[0].endsWith(join(osTempDir, "/").slice(-1)));
 });
