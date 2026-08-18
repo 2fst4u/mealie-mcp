@@ -815,6 +815,20 @@ test("gives up after exhausting retries and returns the last error", async () =>
   assert.match((res.content[0] as { text: string }).text, /HTTP 502/);
 });
 
+test("gives up after exhausting retries on network error", async () => {
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    throw new Error("Network offline");
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+  assert.equal(res.isError, true);
+  assert.equal(callCount, 3); // 1 initial + 2 retries
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /failed: Network offline/);
+});
+
 test("does not retry a non-idempotent POST on 503", async () => {
   const postTool: MealieTool = { ...getTool, method: "post", path: "/api/data" };
   let callCount = 0;
