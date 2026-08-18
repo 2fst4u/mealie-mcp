@@ -73,10 +73,15 @@ export function bool(value: string | undefined, fallback = false): boolean {
 
 export function list(value: string | undefined): string[] {
   if (!value) return [];
-  return value
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const parts = value.split(",");
+  const result: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed) {
+      result.push(trimmed);
+    }
+  }
+  return result;
 }
 
 function parseBaseUrl(env: NodeJS.ProcessEnv): string {

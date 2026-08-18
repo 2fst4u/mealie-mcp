@@ -79,3 +79,6 @@ effect to record.
 ## 2026-08-12 - Optimize multipart request building
 **Learning:** Instantiating new `Set` instances for `fileFields` on every `buildMultipart` request adds unnecessary allocation overhead, especially since `fileFields` is static per tool. Additionally, sequentially reading and resolving paths for multiple uploaded files introduces unnecessary blocking I/O.
 **Action:** Precompute static sets during initialization (e.g., in `buildTool`) and store them on the internal object definition. Use `Promise.all` combined with synchronous closures (`() => void`) to parallelize I/O operations while still safely preserving the append order of the resolved values into ordered structures like `FormData`.
+## 2024-08-18 - Optimize list string splitting by avoiding intermediate array allocations
+**Learning:** Chaining array operations like `.map` and `.filter` after a `.split` creates unnecessary intermediate arrays, placing extra pressure on the garbage collector, even for small lists.
+**Action:** Replace map/filter chains after string splits with a single `for...of` loop to iterate over the split parts, perform the trimming, and populate the result array without generating intermediate representations.
