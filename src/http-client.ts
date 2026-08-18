@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import type { Config } from "./config.js";
 import { isRefreshable, type TokenProvider } from "./auth.js";
 import type { MealieTool } from "./tools.js";
+import { safeUrl } from "./utils/url.js";
 
 type ContentBlock =
   | { type: "text"; text: string }
@@ -17,18 +18,6 @@ export interface ToolResult {
 }
 
 const MAX_TEXT = 100_000;
-
-export function safeUrl(urlStr: string): string {
-  try {
-    const parsed = new URL(urlStr);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    // SECURITY: Do not return the raw urlStr here, as it may contain sensitive credentials.
-    // This is a deliberate mitigation for the "Sensitive Data Exposure in Request URL Logging Fallback"
-    // vulnerability to ensure credentials are never leaked if URL parsing fails.
-    return "<invalid url>";
-  }
-}
 
 // `basename()` has already dropped the directory part, so this is not about
 // containment — the allowlist check in `readUpload` owns that. It is about not
