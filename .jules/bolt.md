@@ -79,3 +79,9 @@ effect to record.
 ## 2026-08-12 - Optimize multipart request building
 **Learning:** Instantiating new `Set` instances for `fileFields` on every `buildMultipart` request adds unnecessary allocation overhead, especially since `fileFields` is static per tool. Additionally, sequentially reading and resolving paths for multiple uploaded files introduces unnecessary blocking I/O.
 **Action:** Precompute static sets during initialization (e.g., in `buildTool`) and store them on the internal object definition. Use `Promise.all` combined with synchronous closures (`() => void`) to parallelize I/O operations while still safely preserving the append order of the resolved values into ordered structures like `FormData`.
+## 2025-02-12 - Async I/O for Startup
+**Learning:**
+Converting synchronous I/O to asynchronous I/O (e.g., `readFileSync` to `await readFile`) for small files during startup might benchmark slower in isolation due to promise overhead. However, when integrated into the application, this allows other asynchronous tasks (like handling network requests or parsing configs) to proceed concurrently rather than blocking the event loop entirely. To maximize the performance benefit, the asynchronous file read should ideally be parallelized with other I/O-bound startup tasks (like `loadOpenApi`) using `Promise.all` instead of sequentially awaiting it.
+
+**Action:**
+Replaced `readFileSync` with `readFile` from `node:fs/promises` in `src/index.ts` to read the package version asynchronously, preventing event loop blocking during startup. Future optimizations could further parallelize this read with the OpenAPI spec fetch.
