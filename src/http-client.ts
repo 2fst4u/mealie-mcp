@@ -182,7 +182,7 @@ async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
   return resolved.filter((dir): dir is string => dir !== undefined);
 }
 
-async function readUpload(
+export async function readUpload(
   filePath: string,
   allowedDirs: string[],
 ): Promise<{ filePath: string; blob: Blob }> {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeTool, safeUrl } from "../src/http-client.js";
+import { executeTool, safeUrl, readUpload } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 import type { TokenProvider } from "../src/auth.js";
@@ -359,10 +359,16 @@ test("reports an unreadable upload path instead of a bare filesystem error", asy
 });
 
 test("rejects an upload path that is not a regular file", async () => {
-  await assert.rejects(
-    () => executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
-    /is not a regular file/,
-  );
+  const dirPath = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-"));
+  try {
+    const resolvedDir = await fs.realpath(dirPath);
+    await assert.rejects(
+      () => readUpload(resolvedDir, [resolvedDir]),
+      /is not a regular file/,
+    );
+  } finally {
+    await fs.rm(dirPath, { recursive: true, force: true });
+  }
 });
 
 test("rejects an upload that exceeds the maximum file size", async () => {
