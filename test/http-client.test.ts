@@ -635,6 +635,32 @@ test("handles invalid JSON response gracefully", async () => {
   assert.equal(txt, "{ invalid json }");
 });
 
+test("handles invalid JSON fallback in readJsonBody ('not json')", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/not-json",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response("not json", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as {text: string}).text;
+  assert.equal(txt, "not json");
+});
+
 test("handles non-JSON text/yaml response", async () => {
   const tool: MealieTool = {
     name: "test_tool",
