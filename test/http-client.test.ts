@@ -788,20 +788,22 @@ const getTool: MealieTool = {
   deprecated: false,
 };
 
-test("retries idempotent GET on a 503 then succeeds", async () => {
-  let callCount = 0;
-  mock.method(globalThis, "fetch", async () => {
-    callCount++;
-    if (callCount < 3) {
-      return new Response("Service Unavailable", { status: 503, headers: { "content-type": "text/plain" } });
-    }
-    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
-  });
+for (const status of [429, 500, 502, 503, 504]) {
+  test(`retries idempotent GET on a ${status} then succeeds`, async () => {
+    let callCount = 0;
+    mock.method(globalThis, "fetch", async () => {
+      callCount++;
+      if (callCount < 3) {
+        return new Response("Retryable Error", { status, headers: { "content-type": "text/plain" } });
+      }
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    });
 
-  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
-  assert.equal(res.isError, undefined);
-  assert.equal(callCount, 3);
-});
+    const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+    assert.equal(res.isError, undefined);
+    assert.equal(callCount, 3);
+  });
+}
 
 test("gives up after exhausting retries and returns the last error", async () => {
   let callCount = 0;
