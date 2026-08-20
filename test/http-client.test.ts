@@ -443,9 +443,10 @@ test("refuses a symlink that escapes an allowed directory", async () => {
     const link = join(allowed, "innocent.png");
     await fs.symlink(outside, link);
     const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    const realOutside = await fs.realpath(outside);
     await assert.rejects(
       () => executeTool(config, uploadTool, { body: { image: link } }, dummyAuth),
-      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+      new Error(`Upload failed: ${link} resolves to ${realOutside}, which is outside MEALIE_ALLOWED_UPLOAD_DIRS.`),
     );
   });
 });
