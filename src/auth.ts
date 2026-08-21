@@ -5,6 +5,7 @@
 // HTTP client stay agnostic about where the bearer value comes from.
 
 import type { Config, OAuthConfig } from "./config.js";
+import { safeUrl } from "./utils/url.js";
 
 export interface TokenProvider {
   /**
@@ -24,26 +25,6 @@ interface TokenResponse {
   access_token?: string;
   token_type?: string;
   expires_in?: number;
-}
-
-/**
- * The token endpoint is named in every error this class throws, so strip
- * anything sensitive the operator may have put in it: a query string, or
- * `user:pass@` userinfo, which `origin` drops.
- *
- * Falls back to the raw value when it will not parse. Nothing validates
- * MEALIE_OAUTH_TOKEN_URL as a URL, so a misconfigured one must still produce the
- * "request failed" message that says what broke — not a bare ERR_INVALID_URL
- * thrown out of the sanitizer, before the request is even attempted.
- */
-function safeTokenUrl(tokenUrl: string): string {
-  try {
-    const parsed = new URL(tokenUrl);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    // SECURITY: Do not return the raw tokenUrl here, as it may contain sensitive credentials
-    return "<invalid url>";
-  }
 }
 
 class OAuthTokenProvider implements TokenProvider {
@@ -83,7 +64,7 @@ class OAuthTokenProvider implements TokenProvider {
     let res: Response;
     let rawText: string;
 
-    const safeUrl = safeTokenUrl(this.oauth.tokenUrl);
+    const tokenUrlSafe = safeUrl(this.oauth.tokenUrl);
 
     try {
       res = await fetch(this.oauth.tokenUrl, {
@@ -99,7 +80,7 @@ class OAuthTokenProvider implements TokenProvider {
       rawText = await res.text();
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      throw new Error(`OAuth token request to ${safeUrl} failed: ${reason}`);
+      throw new Error(`OAuth token request to ${tokenUrlSafe} failed: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
@@ -107,7 +88,7 @@ class OAuthTokenProvider implements TokenProvider {
     if (!res.ok) {
       // SECURITY: Do not include rawText in the error message to avoid leaking sensitive information.
       throw new Error(
-        `OAuth token request to ${safeUrl} returned HTTP ${res.status} ${res.statusText}`,
+        `OAuth token request to ${tokenUrlSafe} returned HTTP ${res.status} ${res.statusText}`,
       );
     }
 
@@ -115,10 +96,10 @@ class OAuthTokenProvider implements TokenProvider {
     try {
       parsed = JSON.parse(rawText) as TokenResponse;
     } catch {
-      throw new Error(`OAuth token response from ${safeUrl} was not valid JSON.`);
+      throw new Error(`OAuth token response from ${tokenUrlSafe} was not valid JSON.`);
     }
     if (!parsed || typeof parsed !== "object" || !parsed.access_token) {
-      throw new Error(`OAuth token response from ${safeUrl} did not include an access_token.`);
+      throw new Error(`OAuth token response from ${tokenUrlSafe} did not include an access_token.`);
     }
 
     const lifetimeMs = (parsed.expires_in ?? DEFAULT_LIFETIME_S) * 1000;
