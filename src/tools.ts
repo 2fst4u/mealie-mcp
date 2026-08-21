@@ -146,9 +146,11 @@ function findFileFields(schema: JsonSchema | undefined, components: Record<strin
     }
     return false;
   };
-  return Object.entries(props)
-    .filter(([, s]) => isBinary(s))
-    .map(([k]) => k);
+  const result: string[] = [];
+  for (const k of Object.keys(props)) {
+    if (isBinary(props[k])) result.push(k);
+  }
+  return result;
 }
 
 function pickBody(
