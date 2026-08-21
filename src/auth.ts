@@ -5,6 +5,7 @@
 // HTTP client stay agnostic about where the bearer value comes from.
 
 import type { Config, OAuthConfig } from "./config.js";
+import { safeUrl } from "./utils/url.js";
 
 export interface TokenProvider {
   /**
@@ -36,15 +37,6 @@ interface TokenResponse {
  * "request failed" message that says what broke — not a bare ERR_INVALID_URL
  * thrown out of the sanitizer, before the request is even attempted.
  */
-function safeTokenUrl(tokenUrl: string): string {
-  try {
-    const parsed = new URL(tokenUrl);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    // SECURITY: Do not return the raw tokenUrl here, as it may contain sensitive credentials
-    return "<invalid url>";
-  }
-}
 
 class OAuthTokenProvider implements TokenProvider {
   private cached?: { header: string; expiresAt: number };
@@ -83,7 +75,7 @@ class OAuthTokenProvider implements TokenProvider {
     let res: Response;
     let rawText: string;
 
-    const safeUrl = safeTokenUrl(this.oauth.tokenUrl);
+    const safeTokenUrl = safeUrl(this.oauth.tokenUrl);
 
     try {
       res = await fetch(this.oauth.tokenUrl, {
@@ -99,7 +91,7 @@ class OAuthTokenProvider implements TokenProvider {
       rawText = await res.text();
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      throw new Error(`OAuth token request to ${safeUrl} failed: ${reason}`);
+      throw new Error(`OAuth token request to ${safeTokenUrl} failed: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
@@ -107,7 +99,7 @@ class OAuthTokenProvider implements TokenProvider {
     if (!res.ok) {
       // SECURITY: Do not include rawText in the error message to avoid leaking sensitive information.
       throw new Error(
-        `OAuth token request to ${safeUrl} returned HTTP ${res.status} ${res.statusText}`,
+        `OAuth token request to ${safeTokenUrl} returned HTTP ${res.status} ${res.statusText}`,
       );
     }
 
@@ -115,10 +107,10 @@ class OAuthTokenProvider implements TokenProvider {
     try {
       parsed = JSON.parse(rawText) as TokenResponse;
     } catch {
-      throw new Error(`OAuth token response from ${safeUrl} was not valid JSON.`);
+      throw new Error(`OAuth token response from ${safeTokenUrl} was not valid JSON.`);
     }
     if (!parsed || typeof parsed !== "object" || !parsed.access_token) {
-      throw new Error(`OAuth token response from ${safeUrl} did not include an access_token.`);
+      throw new Error(`OAuth token response from ${safeTokenUrl} did not include an access_token.`);
     }
 
     const lifetimeMs = (parsed.expires_in ?? DEFAULT_LIFETIME_S) * 1000;
