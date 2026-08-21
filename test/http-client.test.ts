@@ -2,8 +2,8 @@ import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { executeTool, safeUrl, readUpload } from "../src/http-client.js";
+import { join, sep } from "node:path";
+import { executeTool, safeUrl, readUpload, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 import type { TokenProvider } from "../src/auth.js";
@@ -997,4 +997,18 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
     const safe = safeUrl(str);
     assert.equal(safe, "<invalid url>");
   }
+});
+
+test("resolveAllowedDirs drops non-existent paths", async () => {
+  const allowed = await resolveAllowedDirs(["/does/not/exist/ever/12345"]);
+  assert.deepEqual(allowed, []);
+});
+
+test("resolveAllowedDirs returns existing paths with trailing separator", async () => {
+  const tmp = await fs.realpath(tmpdir());
+  const allowed = await resolveAllowedDirs([tmp]);
+
+  assert.equal(allowed.length, 1);
+  const expected = tmp.endsWith(sep) ? tmp : tmp + sep;
+  assert.equal(allowed[0], expected);
 });
