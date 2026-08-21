@@ -157,7 +157,7 @@ function scalar(value: unknown): string {
  * not resolve (typo, not mounted) are dropped rather than throwing: a bad entry
  * must never widen the allowlist, and dropping it can only narrow.
  */
-async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
+export async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
   const resolved = await Promise.all(
     dirs.map(async (dir) => {
       try {

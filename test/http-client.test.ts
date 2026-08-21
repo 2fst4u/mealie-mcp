@@ -2,8 +2,8 @@ import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { executeTool, readUpload } from "../src/http-client.js";
+import { join, sep } from "node:path";
+import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -998,4 +998,18 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
     const safe = safeUrl(str);
     assert.equal(safe, "<invalid url>");
   }
+});
+
+test("resolveAllowedDirs drops non-existent paths", async () => {
+  const dirs = await resolveAllowedDirs(["/path/does/not/exist/12345", "/another/bad/path"]);
+  assert.deepEqual(dirs, []);
+});
+
+test("resolveAllowedDirs realpaths valid entries and gives them a trailing separator", async () => {
+  // The trailing separator is what stops `/srv/uploads` from being satisfied by
+  // `/srv/uploads-evil`, and the realpath is what makes a symlinked allowed
+  // directory match, so assert on both rather than just the entry surviving.
+  const real = await fs.realpath(tmpdir());
+  const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
+  assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
 });
