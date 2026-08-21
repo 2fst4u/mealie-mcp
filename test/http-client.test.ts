@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeTool, safeUrl, readUpload } from "../src/http-client.js";
+import { executeTool, safeUrl, readUpload, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
 import type { TokenProvider } from "../src/auth.js";
@@ -996,5 +996,27 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
   for (const str of invalidStrs) {
     const safe = safeUrl(str);
     assert.equal(safe, "<invalid url>");
+  }
+});
+
+test("resolveAllowedDirs drops non-existent paths and returns empty array or subset", async () => {
+  const existingDir = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-allowed-dirs-"));
+  const nonExistentDir = join(existingDir, "does-not-exist");
+
+  try {
+    const resolved = await resolveAllowedDirs([existingDir, nonExistentDir]);
+
+    // Should drop non-existent dir and only keep the existing one
+    assert.equal(resolved.length, 1);
+
+    // The path should end with a separator
+    const sep = process.platform === "win32" ? "\\" : "/";
+    assert.ok(resolved[0].endsWith(sep));
+
+    // Test with only non-existent paths
+    const resolvedEmpty = await resolveAllowedDirs([nonExistentDir, "/tmp/another-fake-dir-123456789"]);
+    assert.equal(resolvedEmpty.length, 0);
+  } finally {
+    await fs.rm(existingDir, { recursive: true, force: true });
   }
 });
