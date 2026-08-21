@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { executeTool } from "../src/http-client.js";
+import { executeTool, readUpload } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -360,10 +360,16 @@ test("reports an unreadable upload path instead of a bare filesystem error", asy
 });
 
 test("rejects an upload path that is not a regular file", async () => {
-  await assert.rejects(
-    () => executeTool({ ...dummyConfig, allowedUploadDirs: [tmpdir()] }, uploadTool, { body: { image: tmpdir() } }, dummyAuth),
-    /is not a regular file/,
-  );
+  const dirPath = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-"));
+  try {
+    const resolvedDir = await fs.realpath(dirPath);
+    await assert.rejects(
+      () => readUpload(resolvedDir, [resolvedDir]),
+      /is not a regular file/,
+    );
+  } finally {
+    await fs.rm(dirPath, { recursive: true, force: true });
+  }
 });
 
 test("rejects an upload that exceeds the maximum file size", async () => {
@@ -444,9 +450,10 @@ test("refuses a symlink that escapes an allowed directory", async () => {
     const link = join(allowed, "innocent.png");
     await fs.symlink(outside, link);
     const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
+    const realOutside = await fs.realpath(outside);
     await assert.rejects(
       () => executeTool(config, uploadTool, { body: { image: link } }, dummyAuth),
-      /outside MEALIE_ALLOWED_UPLOAD_DIRS/,
+      new Error(`Upload failed: ${link} resolves to ${realOutside}, which is outside MEALIE_ALLOWED_UPLOAD_DIRS.`),
     );
   });
 });
@@ -788,20 +795,22 @@ const getTool: MealieTool = {
   deprecated: false,
 };
 
-test("retries idempotent GET on a 503 then succeeds", async () => {
-  let callCount = 0;
-  mock.method(globalThis, "fetch", async () => {
-    callCount++;
-    if (callCount < 3) {
-      return new Response("Service Unavailable", { status: 503, headers: { "content-type": "text/plain" } });
-    }
-    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
-  });
+for (const status of [429, 500, 502, 503, 504]) {
+  test(`retries idempotent GET on a ${status} then succeeds`, async () => {
+    let callCount = 0;
+    mock.method(globalThis, "fetch", async () => {
+      callCount++;
+      if (callCount < 3) {
+        return new Response("Retryable Error", { status, headers: { "content-type": "text/plain" } });
+      }
+      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+    });
 
-  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
-  assert.equal(res.isError, undefined);
-  assert.equal(callCount, 3);
-});
+    const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+    assert.equal(res.isError, undefined);
+    assert.equal(callCount, 3);
+  });
+}
 
 test("gives up after exhausting retries and returns the last error", async () => {
   let callCount = 0;
@@ -814,6 +823,20 @@ test("gives up after exhausting retries and returns the last error", async () =>
   assert.equal(res.isError, true);
   assert.equal(callCount, 2); // 1 initial + 1 retry
   assert.match((res.content[0] as { text: string }).text, /HTTP 502/);
+});
+
+test("gives up after exhausting retries on network error", async () => {
+  let callCount = 0;
+  mock.method(globalThis, "fetch", async () => {
+    callCount++;
+    throw new Error("Network offline");
+  });
+
+  const res = await executeTool({ ...dummyConfig, retries: 2 }, getTool, {}, dummyAuth);
+  assert.equal(res.isError, true);
+  assert.equal(callCount, 3); // 1 initial + 2 retries
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /failed: Network offline/);
 });
 
 test("does not retry a non-idempotent POST on 503", async () => {
