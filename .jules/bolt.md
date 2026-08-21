@@ -80,3 +80,8 @@ effect to record.
 **Learning:** Instantiating new `Set` instances for `fileFields` on every `buildMultipart` request adds unnecessary allocation overhead, especially since `fileFields` is static per tool. Additionally, sequentially reading and resolving paths for multiple uploaded files introduces unnecessary blocking I/O.
 **Action:** Precompute static sets during initialization (e.g., in `buildTool`) and store them on the internal object definition. Use `Promise.all` combined with synchronous closures (`() => void`) to parallelize I/O operations while still safely preserving the append order of the resolved values into ordered structures like `FormData`.
 ## 2024-08-18 - Optimize array allocations in object entry iteration\n**Learning:** When iterating over object properties without needing a tuple array, `for...of Object.keys(obj)` is significantly faster and allocates fewer intermediate arrays compared to `Object.entries(obj).filter(...).map(...)`.\n**Action:** Avoid chaining array methods like `.filter()` and `.map()` on `Object.entries()` when simple property accumulation is needed. Prefer `for...of Object.keys(obj)` instead.
+## 2025-02-19 - Avoid intermediate array allocations in list parsing
+
+**Learning:** Chaining array methods like `.map().filter()` when processing strings (e.g. splitting CSV values) causes unnecessary intermediate array allocations, adding GC overhead and wasting CPU cycles.
+
+**Action:** Replace functional array method chains with a single `for...of` loop or `reduce` to process elements in a single pass without allocating intermediate structures.
