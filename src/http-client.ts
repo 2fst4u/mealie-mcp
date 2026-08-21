@@ -182,7 +182,7 @@ async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
   return resolved.filter((dir): dir is string => dir !== undefined);
 }
 
-async function readUpload(
+export async function readUpload(
   filePath: string,
   allowedDirs: string[],
 ): Promise<{ filePath: string; blob: Blob }> {
@@ -194,10 +194,10 @@ async function readUpload(
   try {
     realPath = await realpath(filePath);
   } catch (err) {
-    // Paths here come from a model, so a bare ENOENT/EACCES is worth restating
-    // in terms of the upload it broke.
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(`Upload failed: cannot read ${filePath} (${reason}).`);
+    // SECURITY: Do not expose raw filesystem error messages (e.g., ENOENT, EACCES) to prevent Sensitive Data Exposure.
+    // Paths here come from a model, so restate the error in terms of the upload it broke
+    // without leaking sensitive system path details.
+    throw new Error(`Upload failed: cannot read ${filePath}`);
   }
 
   if (!allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {

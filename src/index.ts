@@ -25,9 +25,11 @@ async function readVersion(): Promise<string> {
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const version = await readVersion();
 
-  const { doc, source } = await loadOpenApi(config);
+  // ⚡ Bolt: the version read and the spec load are independent, so overlap
+  // them. `loadOpenApi` may go to the network for the live spec, which makes
+  // the package.json read effectively free rather than additive.
+  const [version, { doc, source }] = await Promise.all([readVersion(), loadOpenApi(config)]);
   const allTools = generateTools(doc, config.toolNameMax);
   const tools = filterTools(allTools, config);
 
