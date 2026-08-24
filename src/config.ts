@@ -59,6 +59,8 @@ export interface Config {
    * every entry is refused.
    */
   allowedUploadDirs: string[];
+  /** Internal cache for the normalized base URL (always ends with trailing slash) */
+  _normalizedBase?: { baseUrl: string; base: string; origin: string };
 }
 
 /** Default cap for generated tool names; shared with the tool generator. */

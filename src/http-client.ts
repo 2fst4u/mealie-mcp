@@ -121,12 +121,24 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
   // Both sides need adjusting for that form to preserve a base with a subpath:
   // the base must end in `/` or its last segment is dropped, and the path must
   // not start with `/` or it resolves against the origin and drops the subpath.
-  const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+
+  // ⚡ Bolt: Cache normalized base URL and origin on the config object to avoid
+  // redundant parsing. Use config.baseUrl as cache key to handle test overrides.
+  if (config._normalizedBase === undefined || config._normalizedBase.baseUrl !== config.baseUrl) {
+    const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+    config._normalizedBase = {
+      baseUrl: config.baseUrl,
+      base,
+      origin: new URL(base).origin,
+    };
+  }
+
+  const { base, origin: baseOrigin } = config._normalizedBase;
   const url = new URL(path.replace(/^\/+/, ""), base);
 
   // SECURITY: Assert that the generated URL origin strictly matches the base origin
   // to prevent Server-Side Request Forgery (SSRF) via protocol-relative paths or absolute URLs.
-  if (url.origin !== new URL(base).origin) {
+  if (url.origin !== baseOrigin) {
     throw new Error("SSRF attack detected: URL origin mismatch");
   }
 
