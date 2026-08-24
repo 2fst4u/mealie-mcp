@@ -171,6 +171,28 @@ export async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
   return resolved.filter((dir): dir is string => dir !== undefined);
 }
 
+function createFileStreamingBlob(realPath: string, type: string, size: number): Blob {
+  // Fallback for Node 18: create a duck-typed Blob that streams the file
+  // to avoid loading up to 50MB into the V8 heap at once.
+  return {
+    [Symbol.toStringTag]: "Blob",
+    type,
+    size,
+    stream() {
+      return Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
+    },
+    arrayBuffer() {
+      return new Response((this as any).stream()).arrayBuffer();
+    },
+    slice() {
+      return this;
+    },
+    text() {
+      return new Response((this as any).stream()).text();
+    },
+  } as unknown as Blob;
+}
+
 export async function readUpload(
   filePath: string,
   allowedDirs: string[],
@@ -213,25 +235,7 @@ export async function readUpload(
   // file has to stay put until the request goes out.
   if (openAsBlob) return { filePath, blob: await openAsBlob(realPath, { type }) };
 
-  // Fallback for Node 18: create a duck-typed Blob that streams the file
-  // to avoid loading up to 50MB into the V8 heap at once.
-  const blob = {
-    [Symbol.toStringTag]: "Blob",
-    type,
-    size: stats.size,
-    stream() {
-      return Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
-    },
-    arrayBuffer() {
-      return new Response((this as any).stream()).arrayBuffer();
-    },
-    slice() {
-      return this;
-    },
-    text() {
-      return new Response((this as any).stream()).text();
-    },
-  } as unknown as Blob;
+  const blob = createFileStreamingBlob(realPath, type, stats.size);
 
   return { filePath, blob };
 }
