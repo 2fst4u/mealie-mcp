@@ -172,8 +172,13 @@ function pickBody(
     return { kind: "urlencoded", schema: content["application/x-www-form-urlencoded"].schema, required, fileFields: [] };
   }
   // Unknown body type: treat the first available content as JSON-ish passthrough.
-  const first = Object.values(content)[0];
-  return first ? { kind: "json", schema: first.schema, required, fileFields: [] } : undefined;
+  for (const key in content) {
+    const first = content[key];
+    if (first) {
+      return { kind: "json", schema: first.schema, required, fileFields: [] };
+    }
+  }
+  return undefined;
 }
 
 function processParams(params: OpenApiParameter[]): {
