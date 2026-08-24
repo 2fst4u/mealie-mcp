@@ -32,6 +32,35 @@ export function clone<T>(value: T): T {
 }
 
 /**
+ * Recursively walk a schema node and invoke a callback for every
+ * `#/components/schemas/<name>` reference found.
+ */
+function walkRefs(
+  node: unknown,
+  onRef: (name: string, obj: Record<string, unknown>) => void,
+): void {
+  if (Array.isArray(node)) {
+    for (const item of node) walkRefs(item, onRef);
+    return;
+  }
+  if (!node || typeof node !== "object") return;
+
+  const obj = node as Record<string, unknown>;
+  if (typeof obj.$ref === "string" && obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
+    const name = obj.$ref.slice(COMPONENT_REF_PREFIX.length);
+    if (name) onRef(name, obj);
+  }
+
+  // ⚡ Bolt: Using for...in avoids Object.entries() which allocates an array
+  // of all key-value pairs on every recursive call, severely hurting performance.
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    if (key === "$ref") continue;
+    walkRefs(obj[key], onRef);
+  }
+}
+
+/**
  * Walk a schema node and collect every `#/components/schemas/<name>` it
  * references, transitively, by following into the referenced components.
  */
@@ -40,51 +69,19 @@ function collectRefs(
   components: Record<string, JsonSchema>,
   seen: Set<string>,
 ): void {
-  if (Array.isArray(node)) {
-    for (const item of node) collectRefs(item, components, seen);
-    return;
-  }
-  if (!node || typeof node !== "object") return;
-
-  const obj = node as Record<string, unknown>;
-  if (typeof obj.$ref === "string" && obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
-    const name = obj.$ref.slice(COMPONENT_REF_PREFIX.length);
-    if (name && !seen.has(name)) {
+  walkRefs(node, (name) => {
+    if (!seen.has(name)) {
       seen.add(name);
       if (components[name]) collectRefs(components[name], components, seen);
     }
-  }
-
-  // ⚡ Bolt: Using for...in avoids Object.entries() which allocates an array
-  // of all key-value pairs on every recursive call, severely hurting performance.
-  for (const key in obj) {
-    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
-    if (key === "$ref") continue;
-    collectRefs(obj[key], components, seen);
-  }
+  });
 }
 
 /** Rewrite `#/components/schemas/X` refs to local `#/$defs/X` refs (in place). */
 function rewriteRefs(node: unknown): void {
-  if (Array.isArray(node)) {
-    for (const item of node) rewriteRefs(item);
-    return;
-  }
-  if (!node || typeof node !== "object") return;
-
-  const obj = node as Record<string, unknown>;
-  if (typeof obj.$ref === "string" && obj.$ref.startsWith(COMPONENT_REF_PREFIX)) {
-    const name = obj.$ref.slice(COMPONENT_REF_PREFIX.length);
-    if (name) obj.$ref = `#/$defs/${name}`;
-  }
-
-  // ⚡ Bolt: Using for...in avoids Object.values() which allocates an array
-  // of all values on every recursive call.
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      if (key !== "$ref") rewriteRefs(obj[key]);
-    }
-  }
+  walkRefs(node, (name, obj) => {
+    obj.$ref = `#/$defs/${name}`;
+  });
 }
 
 /**
