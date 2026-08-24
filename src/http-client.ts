@@ -215,21 +215,20 @@ export async function readUpload(
 
   // Fallback for Node 18: create a duck-typed Blob that streams the file
   // to avoid loading up to 50MB into the V8 heap at once.
+  const stream = () => Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
   const blob = {
     [Symbol.toStringTag]: "Blob",
     type,
     size: stats.size,
-    stream() {
-      return Readable.toWeb(fs.createReadStream(realPath)) as ReadableStream;
-    },
+    stream,
     arrayBuffer() {
-      return new Response((this as any).stream()).arrayBuffer();
+      return new Response(stream()).arrayBuffer();
     },
     slice() {
       return this;
     },
     text() {
-      return new Response((this as any).stream()).text();
+      return new Response(stream()).text();
     },
   } as unknown as Blob;
 
