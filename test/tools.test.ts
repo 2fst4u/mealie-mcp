@@ -12,7 +12,6 @@ import {
   schemaAllowsArray,
   type MealieTool,
 } from "../src/tools.js";
-import type { Config } from "../src/config.js";
 import { makeConfig } from "./helpers.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
 
