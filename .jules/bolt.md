@@ -83,3 +83,6 @@ effect to record.
 ## 2026-08-18 - Async I/O for startup
 **Learning:** Converting a small startup read (`readFileSync` -> `await readFile`) is a wash on its own — the promise overhead can even benchmark slower, and an `await` that sits alone in a sequential chain blocks exactly as long as the sync call did. The win only materialises when the now-async read is overlapped with another I/O-bound startup task.
 **Action:** Read the package version with `readFile` from `node:fs/promises` and drive it concurrently with `loadOpenApi` via `Promise.all`, so the package.json read is free whenever the spec is being fetched over the network.
+## 2023-10-27 - Avoid Unconditional Array Allocation for Single Items
+**Learning:** When a variable could be a scalar or an array, unconditionally wrapping it in an array (e.g., `const items = Array.isArray(val) ? val : [val]; items.map(...)`) creates unnecessary array allocations and functional call overhead for single items.
+**Action:** Use an `if (Array.isArray(val))` check to handle the array case using `map` or iteration, and add an `else` branch to handle the single scalar value directly, bypassing intermediate array allocations.

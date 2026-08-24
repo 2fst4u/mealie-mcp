@@ -253,13 +253,19 @@ async function buildMultipart(
     Object.entries(body).map(async ([key, value]) => {
       if (value === undefined || value === null) return () => {};
       if (fileFields.has(key)) {
-        const paths = Array.isArray(value) ? value : [value];
-        const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
-        return () => {
-          for (const { filePath, blob } of files) {
+        if (Array.isArray(value)) {
+          const files = await Promise.all(value.map((p) => readUpload(String(p), allowedDirs)));
+          return () => {
+            for (const { filePath, blob } of files) {
+              form.append(key, blob, sanitizeFilename(basename(filePath)));
+            }
+          };
+        } else {
+          const { filePath, blob } = await readUpload(String(value), allowedDirs);
+          return () => {
             form.append(key, blob, sanitizeFilename(basename(filePath)));
-          }
-        };
+          };
+        }
       } else if (Array.isArray(value)) {
         return () => {
           for (const item of value) form.append(key, scalar(item));
