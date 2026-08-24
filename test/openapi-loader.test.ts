@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadOpenApi } from "../src/openapi-loader.js";
-import type { Config } from "../src/config.js";
 import { makeConfig } from "./helpers.js";
 
 
