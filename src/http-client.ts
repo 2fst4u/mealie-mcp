@@ -249,7 +249,8 @@ async function buildMultipart(
   // ⚡ Bolt: Process files concurrently to overlap I/O latency, but return
   // synchronous closures to execute sequentially and preserve append order.
   const operations = await Promise.all(
-    Object.entries(body).map(async ([key, value]) => {
+    Object.keys(body).map(async (key) => {
+      const value = body[key];
       if (value === undefined || value === null) return () => {};
       if (fileFields.has(key)) {
         const paths = Array.isArray(value) ? value : [value];
@@ -355,7 +356,8 @@ async function buildPayload(
 
   if (tool.body.kind === "urlencoded") {
     const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(bodyValue)) {
+    for (const k of Object.keys(bodyValue)) {
+      const v = bodyValue[k];
       if (v !== undefined && v !== null) params.append(k, scalar(v));
     }
     return params;
