@@ -172,7 +172,14 @@ function pickBody(
     return { kind: "urlencoded", schema: content["application/x-www-form-urlencoded"].schema, required, fileFields: [] };
   }
   // Unknown body type: treat the first available content as JSON-ish passthrough.
-  const first = Object.values(content)[0];
+  // ⚡ Bolt: Using for...in avoids Object.values() allocating a temporary array just to get the first item.
+  let first: { schema?: JsonSchema } | undefined;
+  for (const k in content) {
+    if (Object.prototype.hasOwnProperty.call(content, k)) {
+      first = content[k];
+      break;
+    }
+  }
   return first ? { kind: "json", schema: first.schema, required, fileFields: [] } : undefined;
 }
 

@@ -83,3 +83,7 @@ effect to record.
 ## 2026-08-18 - Async I/O for startup
 **Learning:** Converting a small startup read (`readFileSync` -> `await readFile`) is a wash on its own — the promise overhead can even benchmark slower, and an `await` that sits alone in a sequential chain blocks exactly as long as the sync call did. The win only materialises when the now-async read is overlapped with another I/O-bound startup task.
 **Action:** Read the package version with `readFile` from `node:fs/promises` and drive it concurrently with `loadOpenApi` via `Promise.all`, so the package.json read is free whenever the spec is being fetched over the network.
+## 2026-10-24 - Avoid Object.entries and Object.values overhead
+
+**Learning:** `Object.entries(obj)` allocates an intermediate tuple `[key, value]` for every property in the object, leading to substantial GC overhead when called frequently on large objects. Similarly, `Object.values(obj)[0]` allocates a full array containing all values in an object just to read the first one.
+**Action:** Replace `Object.entries(obj).map(([k, v]) => ...)` with `Object.keys(obj).map(k => { const v = obj[k]; ... })`. Replace `Object.values(obj)[0]` with a `for...in` loop and an early `break` when only the first item is needed.
