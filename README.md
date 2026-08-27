@@ -25,10 +25,11 @@ cookbooks, households, users and more.
 
 ## Quick start
 
-You need two things:
+You need three things:
 
-1. The base URL of your Mealie instance, e.g. `https://mealie.example.com`
-2. A Mealie **API token** (see [Getting an API token](#getting-an-api-token))
+1. **Node.js 18+** installed on your machine
+2. The base URL of your Mealie instance, e.g. `https://mealie.example.com`
+3. A Mealie **API token** (see [Getting an API token](#getting-an-api-token))
 
 Run it with `npx`:
 
@@ -315,11 +316,11 @@ must stay within the API's 64-character limit. If you hit this error:
 ```bash
 git clone https://github.com/2fst4u/mealie-mcp.git
 cd mealie-mcp
-npm install
+npm ci
 
+npm run typecheck   # type-check without emitting
 npm run build       # compile TypeScript to dist/
 npm test            # run the test suite (node:test)
-npm run typecheck   # type-check without emitting
 
 # Run from source against a Mealie instance:
 MEALIE_BASE_URL="https://demo.mealie.io" npm run dev
