@@ -25,10 +25,11 @@ cookbooks, households, users and more.
 
 ## Quick start
 
-You need two things:
+You need three things:
 
-1. The base URL of your Mealie instance, e.g. `https://mealie.example.com`
-2. A Mealie **API token** (see [Getting an API token](#getting-an-api-token))
+1. **Node.js 22+** installed on your machine
+2. The base URL of your Mealie instance, e.g. `https://mealie.example.com`
+3. A Mealie **API token** (see [Getting an API token](#getting-an-api-token))
 
 Run it with `npx`:
 
@@ -355,7 +356,7 @@ npm run refresh-spec -- https://demo.mealie.io
 This repo ships two GitHub Actions workflows:
 
 - **CI** (`.github/workflows/ci.yml`) — runs type-check, build and tests on every
-  pull request across Node 18/20/22.
+  pull request across Node 22/24.
 - **Release** (`.github/workflows/release.yml`) — on every push/merge to `main` that touches source files,
   builds and tests, auto-bumps the patch version, creates a GitHub Release `v<version>` (with auto-generated
   notes), and publishes to npm.
