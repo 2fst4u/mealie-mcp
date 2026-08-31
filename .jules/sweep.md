@@ -17,3 +17,6 @@
 ## 2026-08-09 - Code Health: Use for...of for clean array iteration
 **Learning:**
 Code health convention: Prefer `for...of` loops for simple array iteration to improve readability, as modern JS engines highly optimize them. Retain index-based `for` loops primarily when assigning to pre-allocated arrays in performance-critical paths (e.g., recursive cloning) where explicit indexing is necessary.
+## 2023-11-09 - Unused TypeScript mock parameters
+**Learning:** In TypeScript tests, especially when mocking library functions like `fetch`, parameters that are required by the mocked type signature but unused in the mock implementation can trigger `noUnusedParameters` compiler errors if strictly configured.
+**Action:** Always verify test files are clear of unused parameter errors by running `npx tsc -p tsconfig.test.json --noUnusedLocals --noUnusedParameters`. When cleaning up unused parameters in mocks, safely rename them by prefixing with an underscore (`_`) or completely remove trailing parameters if they aren't needed.

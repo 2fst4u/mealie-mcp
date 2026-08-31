@@ -23,7 +23,7 @@ const dummyConfig: Config = {
 };
 
 const dummyAuth: TokenProvider = {
-  authHeader: async (forceRefresh) => "Bearer dummy_token",
+  authHeader: async () => "Bearer dummy_token",
 };
 
 afterEach(() => {
@@ -65,7 +65,7 @@ test("builds correct URL with path and query parameters", async () => {
   const args = { userId: "123", tags: ["a", "b"], limit: 10, ignored: "yes" };
 
   let capturedUrl: string | undefined;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
     capturedUrl = url.toString();
     return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
   });
@@ -116,7 +116,7 @@ test("sends JSON body correctly", async () => {
   };
 
   let capturedInit: RequestInit | undefined;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
     capturedInit = init;
     return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
   });
@@ -143,7 +143,7 @@ test("sends urlencoded body correctly", async () => {
   };
 
   let capturedBody: any;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
     capturedBody = init?.body;
     return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
   });
@@ -169,7 +169,7 @@ test("sends multipart body and reads local files", async () => {
   };
 
   let capturedBody: any;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
     capturedBody = init?.body;
     return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
   });
@@ -204,7 +204,7 @@ test("sanitizes the filename sent in a multipart body", async () => {
   };
 
   let capturedBody: any;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
     capturedBody = init?.body;
     return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
   });
@@ -596,7 +596,7 @@ test("skips JSON parse for excessively large JSON responses", async () => {
   });
 
   const originalParse = JSON.parse;
-  const parseMock = mock.method(JSON, "parse", function (this: any, text: string) {
+  const parseMock = mock.method(JSON, "parse", function (this: any, _text: string) {
     return originalParse.apply(this, arguments as any);
   });
 
@@ -757,7 +757,7 @@ test("retries on 401 if token is refreshable", async () => {
   };
 
   let callCount = 0;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, init: RequestInit | undefined) => {
+  mock.method(globalThis, "fetch", async () => {
     callCount++;
     if (callCount === 1) {
       return new Response("Unauthorized", { status: 401, headers: { "content-type": "text/plain" } });
