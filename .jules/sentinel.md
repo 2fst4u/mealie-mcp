@@ -91,3 +91,8 @@ if (url.origin !== new URL(base).origin) {
   throw new Error("SSRF attack detected: URL origin mismatch");
 }
 ```
+
+## 2024-05-24 - SSRF Bypass via Protocol-Relative URLs Using Backslashes
+**Vulnerability:** Node.js `new URL()` converts backslashes (`\`) to forward slashes (`/`), allowing `\\evil.com` to be parsed as the protocol-relative URL `//evil.com`.
+**Learning:** Stripping only leading forward slashes (`^\/+`) from an untrusted path before resolving it against a base URL fails to prevent an attacker from supplying backslashes to construct a protocol-relative path, bypassing SSRF protection.
+**Prevention:** Strip both leading forward slashes and backslashes (e.g., using `replace(/^[\\\/]+/, "")`) from untrusted paths before appending them to a base URL.
