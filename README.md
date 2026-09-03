@@ -190,7 +190,7 @@ names). Examples:
 
 ```bash
 # Only recipes, meal plans and shopping lists:
-MEALIE_TOOLS="recipe,households_mealplans,households_shopping"
+MEALIE_TOOLS="recipe,households_mealplans,households_shopping_lists"
 
 # Baseline, but also drop group seeders + migrations:
 MEALIE_EXCLUDE_TOOLS="groups_seeders,groups_migrations"
