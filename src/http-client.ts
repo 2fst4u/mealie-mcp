@@ -111,7 +111,7 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
   // the base must end in `/` or its last segment is dropped, and the path must
   // not start with `/` or it resolves against the origin and drops the subpath.
   const base = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
-  const url = new URL(path.replace(/^\/+/, ""), base);
+  const url = new URL(path.replace(/^[\\\/]+/, ""), base);
 
   // SECURITY: Assert that the generated URL origin strictly matches the base origin
   // to prevent Server-Side Request Forgery (SSRF) via protocol-relative paths or absolute URLs.
