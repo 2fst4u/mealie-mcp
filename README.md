@@ -358,46 +358,11 @@ npm run refresh-spec -- https://demo.mealie.io
 | `src/server.ts` | MCP server wiring (`tools/list`, `tools/call`). |
 | `openapi.snapshot.json` | Bundled fallback OpenAPI schema. |
 
----
+### Releases
 
-## Releases & publishing
-
-This repo ships two GitHub Actions workflows:
-
-- **CI** (`.github/workflows/ci.yml`) — runs type-check, build and tests on every
-  pull request across Node 22/24.
-- **Release** (`.github/workflows/release.yml`) — on every push/merge to `main` that touches source files,
-  builds and tests, auto-bumps the patch version, creates a GitHub Release `v<version>` (with auto-generated
-  notes), and publishes to npm.
-
-### Publishing to npm (Trusted Publishing / OIDC)
-
-The release workflow publishes via npm **Trusted Publishing**, so there is **no
-`NPM_TOKEN` secret to store** — GitHub Actions authenticates to npm with a
-short-lived OIDC token, and npm generates build provenance automatically.
-
-npm requires a package to exist before you can attach a Trusted Publisher, so
-there is a **one-time bootstrap** for the first ever publish:
-
-1. **Publish the first version manually** from your machine (this also claims the
-   package name):
-   ```bash
-   npm install            # ensure deps
-   npm login              # your normal npm account + 2FA
-   npm publish --access public
-   ```
-2. **Configure the Trusted Publisher** on npmjs.com: open the package page →
-   **Settings** → **Trusted Publisher** → **GitHub Actions**, and enter:
-   - **Organization or user:** `2fst4u`
-   - **Repository:** `mealie-mcp`
-   - **Workflow filename:** `release.yml`
-   - **Environment:** *(leave blank)*
-3. From then on, **every merge to `main` that touches source files auto-bumps the patch version and publishes
-   automatically** over OIDC — no tokens, no manual steps.
-
-> Requirements (handled by the workflow): `id-token: write` permission, Node
-> ≥ 22.14, and npm ≥ 11.5.1. The publish step safely skips if the version is
-> already on npm, so re-runs and the bootstrap version won't cause failures.
+Pull requests are type-checked, built and tested on Node 22 and 24. Merges to
+`main` that touch source files are built, tested, version-bumped, published to
+npm and tagged with a matching GitHub Release automatically.
 
 ---
 
