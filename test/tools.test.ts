@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import {
   generateTools,
   filterTools,
+  hiddenCategories,
   DEFAULT_EXCLUDE,
   HARD_EXCLUDE,
   resolveSchema,
@@ -158,6 +159,37 @@ test("exclude filter removes matching tools", async () => {
   const filtered = filterTools(tools, makeConfig({ exclude: ["admin"] }));
   assert.ok(filtered.every((t) => !t.category.startsWith("admin")));
   assert.ok(filtered.length < tools.length);
+});
+
+test("hiddenCategories names the categories an allow-list drops", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+
+  const { filters, readOnly } = hiddenCategories(tools, makeConfig({ include: ["recipe_crud"] }));
+  assert.ok(filters.includes("recipes_foods"));
+  assert.ok(filters.includes("recipes_units"));
+  assert.ok(!filters.includes("recipe_crud"));
+  assert.deepEqual(readOnly, []);
+
+  // Hard-excluded categories are never on offer, so they are not reported.
+  assert.ok(!filters.some((c) => c.startsWith("admin")));
+});
+
+test("hiddenCategories reports nothing when no user filter is set", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+  assert.deepEqual(hiddenCategories(tools, makeConfig()), { readOnly: [], filters: [] });
+});
+
+test("hiddenCategories attributes write-only categories to readOnly", async () => {
+  const doc = await loadSnapshot();
+  const tools = generateTools(doc);
+  const { readOnly, filters } = hiddenCategories(tools, makeConfig({ readOnly: true }));
+
+  assert.ok(readOnly.length > 0);
+  const kept = new Set(filterTools(tools, makeConfig({ readOnly: true })).map((t) => t.category));
+  assert.ok(readOnly.every((c) => !kept.has(c)));
+  assert.deepEqual(filters, []);
 });
 
 test("hard baseline always drops the default-exclude list and admin endpoints", async () => {
