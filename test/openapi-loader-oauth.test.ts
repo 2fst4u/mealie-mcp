@@ -30,3 +30,37 @@ test("uses the supplied token provider for same-origin live OpenAPI requests", a
     globalThis.fetch = original;
   }
 });
+
+test("falls back to an unauthenticated live fetch when the credential cannot be obtained", async () => {
+  const original = globalThis.fetch;
+  const originalWrite = process.stderr.write.bind(process.stderr);
+  let authorization: string | null = null;
+  let logged = "";
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    return {
+      ok: true,
+      status: 200,
+      statusText: "",
+      json: async () => ({ paths: { "/live": {} }, info: { title: "Live" } }),
+    } as Response;
+  }) as typeof fetch;
+  process.stderr.write = ((chunk: string) => {
+    logged += chunk;
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    const result = await loadOpenApi(makeConfig(), {
+      authHeader: async () => {
+        throw new Error("IdP unreachable");
+      },
+    });
+    assert.equal(result.source, "live");
+    assert.equal(authorization, null);
+    assert.match(logged, /IdP unreachable/);
+  } finally {
+    globalThis.fetch = original;
+    process.stderr.write = originalWrite;
+  }
+});
