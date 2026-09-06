@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadOpenApi } from "../src/openapi-loader.js";
+import { createTokenProvider } from "../src/auth.js";
 import { makeConfig } from "./helpers.js";
 
 test("does not forward credentials to a cross-origin OpenAPI override", async () => {
@@ -17,9 +18,8 @@ test("does not forward credentials to a cross-origin OpenAPI override", async ()
   }) as typeof fetch;
 
   try {
-    const result = await loadOpenApi(
-      makeConfig({ token: "test-token", openapiUrl: "https://untrusted.example/spec.json" }),
-    );
+    const config = makeConfig({ token: "test-token", openapiUrl: "https://untrusted.example/spec.json" });
+    const result = await loadOpenApi(config, createTokenProvider(config));
     assert.equal(result.source, "live");
     assert.equal(authorization, null);
   } finally {

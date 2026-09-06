@@ -36,16 +36,38 @@ async function fetchLive(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: authorization ? { Accept: "application/json", Authorization: authorization } : { Accept: "application/json" },
-    });
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (authorization) headers.Authorization = authorization;
+    const res = await fetch(url, { signal: controller.signal, headers });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} ${res.statusText}`);
     }
     return (await res.json()) as OpenApiDocument;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// Credentials go to the Mealie origin only, never to a cross-origin `openapiUrl`
+// override. A credential failure is reported separately: it breaks every later
+// API call too, so it must not read as a spec-fetch problem.
+async function specAuthorization(config: Config, url: string, auth: TokenProvider) {
+  if (!sameOrigin(config.baseUrl, url)) {
+    if (config.token || config.oauth) {
+      process.stderr.write(
+        `[mealie-mcp] ${safeUrl(url)} is not on the Mealie origin; fetching the spec without credentials.\n`,
+      );
+    }
+    return undefined;
+  }
+  try {
+    return await auth.authHeader();
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `[mealie-mcp] Could not obtain a credential (${reason}); fetching the spec unauthenticated. API calls will fail until this is fixed.\n`,
+    );
+    return undefined;
   }
 }
 
@@ -58,20 +80,14 @@ async function fetchLive(
  *     the exact Mealie version the user runs.
  *  3. On any failure, fall back to the bundled snapshot.
  */
-export async function loadOpenApi(config: Config, auth?: TokenProvider): Promise<LoadedSpec> {
+export async function loadOpenApi(config: Config, auth: TokenProvider): Promise<LoadedSpec> {
   if (config.useBundledSpec) {
     return { doc: await loadBundled(), source: "bundled" };
   }
 
   const url = config.openapiUrl ?? `${config.baseUrl}/openapi.json`;
+  const authorization = await specAuthorization(config, url, auth);
   try {
-    const authorization = sameOrigin(config.baseUrl, url)
-      ? auth
-        ? await auth.authHeader()
-        : config.token
-          ? `Bearer ${config.token}`
-          : undefined
-      : undefined;
     const doc = await fetchLive(url, config.timeoutMs, authorization);
     if (!doc?.paths || typeof doc.paths !== "object") {
       throw new Error("response did not contain an OpenAPI `paths` object");
