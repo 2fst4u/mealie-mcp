@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import type { TokenProvider } from "./auth.js";
 import type { Config } from "./config.js";
 import type { OpenApiDocument } from "./openapi-types.js";
 import { safeUrl } from "./utils/url.js";
@@ -19,13 +20,25 @@ async function loadBundled(): Promise<OpenApiDocument> {
   return JSON.parse(raw) as OpenApiDocument;
 }
 
-async function fetchLive(url: string, timeoutMs: number): Promise<OpenApiDocument> {
+function sameOrigin(left: string, right: string): boolean {
+  try {
+    return new URL(left).origin === new URL(right).origin;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchLive(
+  url: string,
+  timeoutMs: number,
+  authorization?: string,
+): Promise<OpenApiDocument> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: authorization ? { Accept: "application/json", Authorization: authorization } : { Accept: "application/json" },
     });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} ${res.statusText}`);
@@ -45,14 +58,21 @@ async function fetchLive(url: string, timeoutMs: number): Promise<OpenApiDocumen
  *     the exact Mealie version the user runs.
  *  3. On any failure, fall back to the bundled snapshot.
  */
-export async function loadOpenApi(config: Config): Promise<LoadedSpec> {
+export async function loadOpenApi(config: Config, auth?: TokenProvider): Promise<LoadedSpec> {
   if (config.useBundledSpec) {
     return { doc: await loadBundled(), source: "bundled" };
   }
 
   const url = config.openapiUrl ?? `${config.baseUrl}/openapi.json`;
   try {
-    const doc = await fetchLive(url, config.timeoutMs);
+    const authorization = sameOrigin(config.baseUrl, url)
+      ? auth
+        ? await auth.authHeader()
+        : config.token
+          ? `Bearer ${config.token}`
+          : undefined
+      : undefined;
+    const doc = await fetchLive(url, config.timeoutMs, authorization);
     if (!doc?.paths || typeof doc.paths !== "object") {
       throw new Error("response did not contain an OpenAPI `paths` object");
     }

@@ -25,11 +25,11 @@ async function readVersion(): Promise<string> {
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  const auth = createTokenProvider(config);
 
-  // ⚡ Bolt: the version read and the spec load are independent, so overlap
-  // them. `loadOpenApi` may go to the network for the live spec, which makes
-  // the package.json read effectively free rather than additive.
-  const [version, { doc, source }] = await Promise.all([readVersion(), loadOpenApi(config)]);
+  // The version read and the authenticated spec load are independent, so overlap
+  // them. The token provider ensures a permission-scoped live spec is fetched.
+  const [version, { doc, source }] = await Promise.all([readVersion(), loadOpenApi(config, auth)]);
   const allTools = generateTools(doc, config.toolNameMax);
   const tools = filterTools(allTools, config);
 
@@ -54,7 +54,6 @@ async function main(): Promise<void> {
     log("No credentials set — only unauthenticated endpoints will succeed.");
   }
 
-  const auth = createTokenProvider(config);
   const server = createServer(config, tools, version, auth);
   const transport = new StdioServerTransport();
   await server.connect(transport);
