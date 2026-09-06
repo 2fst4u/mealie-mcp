@@ -437,6 +437,37 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  */
 export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
+const categoriesOf = (tools: MealieTool[]): Set<string> => new Set(tools.map((t) => t.category));
+
+/** Categories of `from` that survive nowhere in `kept`, biggest loss first. */
+function lostCategories(from: MealieTool[], kept: Set<string>): string[] {
+  const counts = new Map<string, number>();
+  for (const t of from) {
+    if (!kept.has(t.category)) counts.set(t.category, (counts.get(t.category) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([aName, aCount], [bName, bCount]) => bCount - aCount || aName.localeCompare(bName))
+    .map(([name]) => name);
+}
+
+/**
+ * Whole categories that the spec offers but the user's own settings removed, so
+ * startup can say why they are missing. Hard-excluded categories are not
+ * reported: they are never on offer to begin with.
+ */
+export function hiddenCategories(
+  all: MealieTool[],
+  config: Config,
+): { readOnly: string[]; filters: string[] } {
+  const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
+  const offered = all.filter((t) => !matches(t, hardExcludeConditions));
+  const readable = config.readOnly ? offered.filter((t) => t.method === "get") : offered;
+  return {
+    readOnly: lostCategories(offered, categoriesOf(readable)),
+    filters: lostCategories(readable, categoriesOf(filterTools(all, config))),
+  };
+}
+
 /** Apply the hard-exclude baseline, then read-only / include / exclude filters from config. */
 export function filterTools(tools: MealieTool[], config: Config): MealieTool[] {
   // Baseline trim is unconditional and applied first so user filters can only

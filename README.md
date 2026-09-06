@@ -200,6 +200,15 @@ MEALIE_READ_ONLY=true
 MEALIE_TOOLS="recipe,explore"
 ```
 
+On startup the server names any category your settings hide completely, so a
+missing tool is traceable to the setting responsible rather than looking like a
+gap in the server:
+
+```text
+[mealie-mcp] Exposing 75/259 tools across 12 categories.
+[mealie-mcp] MEALIE_TOOLS hides 33 categories entirely: ... (+25 more; MEALIE_DEBUG=true lists them).
+```
+
 ---
 
 ## How tools are named
