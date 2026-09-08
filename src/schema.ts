@@ -51,10 +51,7 @@ function walkRefs(
     if (name) onRef(name, obj);
   }
 
-  // ⚡ Bolt: Using for...in avoids Object.entries() which allocates an array
-  // of all key-value pairs on every recursive call, severely hurting performance.
-  for (const key in obj) {
-    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+  for (const key of Object.keys(obj)) {
     if (key === "$ref") continue;
     walkRefs(obj[key], onRef);
   }
