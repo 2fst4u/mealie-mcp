@@ -158,6 +158,23 @@ test("gracefully falls back to the bundled spec if the fetch promise rejects (e.
   }
 });
 
+test("gracefully falls back to the bundled spec if fetch rejects with a non-Error primitive", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = () => Promise.reject("Non-standard error string");
+  const stderrStub = stubStderr();
+  try {
+    const result = await load(makeConfig());
+    assert.equal(result.source, "bundled");
+    assert.ok(result.doc.paths, "should contain paths object");
+    assert.equal(stderrStub.logs.length, 1);
+    assert.match(stderrStub.logs[0], /Could not fetch live spec from https:\/\/mealie.example.com\/openapi.json \(/);
+    assert.match(stderrStub.logs[0], /Non-standard error string/);
+  } finally {
+    globalThis.fetch = original;
+    stderrStub.restore();
+  }
+});
+
 test("passes an AbortSignal to fetch to enforce the configured timeout", async () => {
   const liveSpec = { paths: { "/live": {} } };
   const fetchStub = stubFetch([{ body: liveSpec }]);
