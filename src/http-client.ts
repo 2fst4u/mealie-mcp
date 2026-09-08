@@ -292,7 +292,7 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
     return readImageBody(res, contentType);
   }
 
-  if (contentType.includes("application/json")) {
+  if (contentType.startsWith("application/json")) {
     return readJsonBody(res);
   }
 
