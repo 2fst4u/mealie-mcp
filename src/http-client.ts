@@ -351,6 +351,7 @@ async function performRequest(
       headers,
       body: payload,
       signal: controller.signal,
+      redirect: "error",
     });
     // SECURITY: Ensure body is read within the timeout window (prevent Slow Loris DoS attacks)
     const body = await readBody(res);

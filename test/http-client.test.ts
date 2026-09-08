@@ -716,6 +716,30 @@ test("handles network error", async () => {
   assert.match((res.content[0] as {text: string}).text, /Request to GET https:\/\/api.example.com\/api\/test failed: Network offline/);
 });
 
+test("fetch is called with redirect: 'error' to prevent token leakage", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/data",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  let capturedOptions: any;
+  mock.method(globalThis, "fetch", async (url: string | URL | Request, options: any) => {
+    capturedOptions = options;
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(dummyConfig, tool, {}, dummyAuth);
+
+  assert.equal(capturedOptions.redirect, "error");
+});
+
 test("handles HTTP errors gracefully", async () => {
   const tool: MealieTool = {
     name: "test_tool",
