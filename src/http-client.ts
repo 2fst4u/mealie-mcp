@@ -288,12 +288,12 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
     return { blocks: [text(message)], raw: "" };
   }
 
-  if (contentType.startsWith("image/")) {
-    return readImageBody(res, contentType);
+  if (contentType.startsWith("application/json")) {
+    return readJsonBody(res);
   }
 
-  if (contentType.includes("application/json")) {
-    return readJsonBody(res);
+  if (contentType.startsWith("image/")) {
+    return readImageBody(res, contentType);
   }
 
   if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
