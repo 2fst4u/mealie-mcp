@@ -38,7 +38,7 @@ async function fetchLive(
   try {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (authorization) headers.Authorization = authorization;
-    const res = await fetch(url, { signal: controller.signal, headers });
+    const res = await fetch(url, { signal: controller.signal, headers, redirect: "error" });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} ${res.statusText}`);
     }
