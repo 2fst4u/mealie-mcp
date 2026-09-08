@@ -12,12 +12,12 @@ function load(config: Config) {
 
 /** Install a fake global fetch that returns the given token responses in order. */
 function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
-  const calls: Array<{ url: string; signal?: AbortSignal | null; authorization?: string | null }> = [];
+  const calls: Array<{ url: string; signal?: AbortSignal | null; authorization?: string | null; redirect?: string | null }> = [];
   let i = 0;
   const original = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     const headers = new Headers(init?.headers);
-    calls.push({ url: String(url), signal: init?.signal, authorization: headers.get("authorization") });
+    calls.push({ url: String(url), signal: init?.signal, authorization: headers.get("authorization"), redirect: init?.redirect });
     const r = responses[Math.min(i, responses.length - 1)];
     i += 1;
     if (r.status === -1) {
@@ -64,6 +64,18 @@ test("uses the live spec from ${baseUrl}/openapi.json when the fetch succeeds an
     assert.deepEqual(result.doc as unknown, liveSpec);
     assert.equal(fetchStub.calls.length, 1);
     assert.equal(fetchStub.calls[0].url, "https://mealie.example.com/openapi.json");
+  } finally {
+    fetchStub.restore();
+  }
+});
+
+test("fetchLive sets redirect to error to prevent ssrf via redirects", async () => {
+  const liveSpec = { paths: { "/live": {} }, info: { title: "Live" } };
+  const fetchStub = stubFetch([{ body: liveSpec }]);
+  try {
+    await load(makeConfig());
+    assert.equal(fetchStub.calls.length, 1);
+    assert.equal(fetchStub.calls[0].redirect, "error");
   } finally {
     fetchStub.restore();
   }
