@@ -1,8 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createServer } from "../src/server.js";
+import { createServer, SERVER_NAME } from "../src/server.js";
 import type { Config } from "../src/config.js";
 import type { MealieTool } from "../src/tools.js";
+
+test("SERVER_NAME is correctly defined", () => {
+  assert.equal(SERVER_NAME, "mealie-mcp", "SERVER_NAME should be 'mealie-mcp'");
+});
 
 test("server CallToolRequestSchema handler catches errors from executeTool", async () => {
   const config: Config = { baseUrl: "http://example.com" } as any;
