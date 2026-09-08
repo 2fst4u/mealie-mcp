@@ -19,12 +19,12 @@ const oauthConfig = (overrides: Partial<Config> = {}): Config =>
 
 /** Install a fake global fetch that returns the given token responses in order. */
 function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
-  const calls: Array<{ url: string; body: string }> = [];
+  const calls: Array<{ url: string; body: string; redirect?: string }> = [];
   let i = 0;
   const original = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
     const params = init?.body as URLSearchParams;
-    calls.push({ url: String(url), body: params?.toString() ?? "" });
+    calls.push({ url: String(url), body: params?.toString() ?? "", redirect: init?.redirect });
     const r = responses[Math.min(i, responses.length - 1)];
     i += 1;
     if (r.status === -1) {
@@ -52,6 +52,7 @@ test("OAuth provider fetches a bearer token and sends the client-credentials gra
     assert.match(fetchStub.calls[0].body, /client_id=id/);
     assert.match(fetchStub.calls[0].body, /scope=mealie/);
     assert.match(fetchStub.calls[0].body, /audience=aud/);
+    assert.equal(fetchStub.calls[0].redirect, "error");
   } finally {
     fetchStub.restore();
   }

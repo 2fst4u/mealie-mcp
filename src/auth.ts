@@ -75,6 +75,7 @@ class OAuthTokenProvider implements TokenProvider {
         },
         body,
         signal: controller.signal,
+        redirect: "error",
       });
       // SECURITY: Ensure body is read within the timeout window
       rawText = await res.text();
