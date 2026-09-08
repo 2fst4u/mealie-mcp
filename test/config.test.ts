@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, bool, list } from "../src/config.js";
+import { loadConfig, bool, list, DEFAULT_TOOL_NAME_MAX } from "../src/config.js";
 
 test("bool function parses truthy values correctly", () => {
   assert.equal(bool("1"), true);
@@ -162,4 +162,8 @@ test("config list parser behaves correctly on all edge cases", () => {
   assert.deepEqual(list("foo,bar"), ["foo", "bar"]);
   assert.deepEqual(list(" foo , bar "), ["foo", "bar"]);
   assert.deepEqual(list("foo,,bar,"), ["foo", "bar"]);
+});
+
+test("exports DEFAULT_TOOL_NAME_MAX as 50", () => {
+  assert.equal(DEFAULT_TOOL_NAME_MAX, 50);
 });
