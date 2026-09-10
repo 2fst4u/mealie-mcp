@@ -87,3 +87,6 @@ effect to record.
 
 **Learning:** `Object.entries(obj)` allocates an intermediate tuple `[key, value]` for every property in the object, leading to substantial GC overhead when called frequently on large objects. Similarly, `Object.values(obj)[0]` allocates a full array containing all values in an object just to read the first one.
 **Action:** Replace `Object.entries(obj).map(([k, v]) => ...)` with `Object.keys(obj).map(k => { const v = obj[k]; ... })`. Replace `Object.values(obj)[0]` with a `for...in` loop and an early `break` when only the first item is needed.
+## 2026-09-09 - Avoid chained array methods for simple string extractions
+**Learning:** Chained string methods like `.split(delimiter)[0]` to extract a substring create intermediate arrays containing all split segments, which are immediately discarded. In high-frequency paths like parsing HTTP headers, this causes unnecessary garbage collection overhead.
+**Action:** Replace `.split(delimiter)[0]` with `indexOf` and `slice` (e.g. `const idx = str.indexOf(delimiter); return idx === -1 ? str : str.slice(0, idx);`) when only the first segment is needed, avoiding intermediate array allocations entirely.

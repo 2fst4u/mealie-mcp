@@ -251,8 +251,10 @@ async function buildMultipart(
 
 async function readImageBody(res: Response, contentType: string): Promise<{ blocks: ContentBlock[]; raw: string }> {
   const buf = Buffer.from(await res.arrayBuffer());
+  const semiIndex = contentType.indexOf(";");
+  const mimeType = semiIndex === -1 ? contentType : contentType.slice(0, semiIndex);
   return {
-    blocks: [{ type: "image", data: buf.toString("base64"), mimeType: contentType.split(";")[0] }],
+    blocks: [{ type: "image", data: buf.toString("base64"), mimeType }],
     raw: `[image ${contentType} ${buf.length} bytes]`,
   };
 }
