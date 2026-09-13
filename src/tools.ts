@@ -1,4 +1,5 @@
 import { DEFAULT_TOOL_NAME_MAX, type Config } from "./config.js";
+import { buildDescription } from "./description.js";
 import { buildDefs, COMPONENT_REF_PREFIX, localize } from "./schema.js";
 import {
   HTTP_METHODS,
@@ -91,19 +92,6 @@ function buildName(category: string, base: string, prefixed: boolean): string {
 function clampName(name: string, max: number): string {
   if (name.length <= max) return name;
   return name.slice(0, max).replace(/_+$/, "") || name.slice(0, max);
-}
-
-function buildDescription(op: OpenApiOperation, path: string, method: string): string {
-  const parts: string[] = [];
-  if (op.summary) parts.push(op.summary);
-  parts.push(`[${method.toUpperCase()} ${path}]`);
-  if (op.description && op.description.trim() && op.description.trim() !== op.summary) {
-    parts.push(op.description.trim());
-  }
-  if (op.deprecated) parts.unshift("(DEPRECATED)");
-  let text = parts.join("\n");
-  if (text.length > 2000) text = `${text.slice(0, 1997)}...`;
-  return text;
 }
 
 /** Does a parameter schema permit an array value (so we repeat the query key)? */
@@ -329,7 +317,7 @@ function buildTool(
 
   return {
     name,
-    description: buildDescription(entry.op, entry.path, entry.method),
+    description: buildDescription(entry.op, entry.path, entry.method, name, entry.category),
     inputSchema,
     category: entry.category,
     method: entry.method,
