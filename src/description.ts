@@ -13,39 +13,6 @@ import type { HttpMethod, OpenApiOperation } from "./openapi-types.js";
 /** Hard ceiling on a generated description, matching the MCP tool-description budget. */
 const MAX_DESCRIPTION = 2000;
 
-/**
- * Name tokens that carry no domain meaning on their own. An operation name made
- * up purely of these (`patch_one`, `create_many`) is unfindable by name, so it
- * gets prefixed with its category even when it is already unique.
- */
-const GENERIC_NAME_TOKENS = new Set([
-  "get",
-  "list",
-  "create",
-  "add",
-  "new",
-  "update",
-  "patch",
-  "put",
-  "post",
-  "delete",
-  "remove",
-  "set",
-  "test",
-  "duplicate",
-  "one",
-  "many",
-  "all",
-  "single",
-  "bulk",
-  "item",
-  "items",
-  "by",
-  "id",
-  "self",
-  "current",
-]);
-
 /** Path words Mealie writes as one token but readers (and search) split. */
 const COMPOUND_WORDS: Record<string, string> = {
   mealplan: "meal plan",
@@ -117,12 +84,6 @@ const METHOD_ACTIONS: Record<string, Action> = {
   patch: { verb: "Partially update", synonyms: ["patch", "update", "edit", "modify", "change", "write"] },
   delete: { verb: "Delete", synonyms: ["delete", "remove", "destroy", "write"] },
 };
-
-/** Is every token in `base` a generic CRUD word, leaving nothing domain-specific? */
-export function isGenericName(base: string): boolean {
-  const tokens = base.split("_").filter((t) => t.length > 0);
-  return tokens.length > 0 && tokens.every((t) => GENERIC_NAME_TOKENS.has(t));
-}
 
 /** Crude English singularisation — good enough for REST path segments. */
 export function singularize(word: string): string {

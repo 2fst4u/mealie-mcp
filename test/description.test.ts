@@ -7,7 +7,6 @@ import {
   buildDescription,
   buildHeadline,
   buildKeywords,
-  isGenericName,
   resourceNoun,
   singularize,
 } from "../src/description.js";
@@ -112,26 +111,17 @@ test("a deprecated operation still says so first", () => {
   assert.ok(text.startsWith("(DEPRECATED) "));
 });
 
-test("isGenericName flags names made only of CRUD boilerplate", () => {
-  assert.ok(isGenericName("patch_one"));
-  assert.ok(isGenericName("create_many"));
-  assert.ok(isGenericName("test_one"));
-  assert.ok(!isGenericName("suggest_recipes"));
-  assert.ok(!isGenericName("parse_ingredient"));
-  assert.ok(!isGenericName(""));
-});
-
 test("generated tools are findable by resource and action", async () => {
   const tools = generateTools(await loadSnapshot());
   const find = (name: string) => tools.find((t) => t.name === name);
 
-  // Names that were pure CRUD boilerplate now carry their category, so a search
-  // for the resource reaches them by name as well as by description.
-  assert.ok(find("recipe_crud_patch_one"), "recipe_crud_patch_one missing");
-  assert.ok(!find("patch_one"), "bare patch_one should no longer exist");
+  // Tool names are left alone, so a terse one like `patch_one` stays findable by
+  // name only because the description embeds it.
+  assert.ok(find("patch_one"), "patch_one missing");
 
-  // Every write tool for a resource mentions that resource and an update verb.
-  for (const name of ["recipe_crud_patch_one", "recipe_crud_update_one"]) {
+  // Every write tool for a recipe mentions the resource and an update verb, so
+  // the queries that previously only matched the literal endpoint path now hit.
+  for (const name of ["patch_one", "recipe_crud_update_one"]) {
     const description = find(name)!.description.toLowerCase();
     assert.ok(description.includes("update recipe"), `${name} not findable by "update recipe"`);
     assert.ok(description.includes(name), `${name} does not mention its own name`);

@@ -1,5 +1,5 @@
 import { DEFAULT_TOOL_NAME_MAX, type Config } from "./config.js";
-import { buildDescription, isGenericName } from "./description.js";
+import { buildDescription } from "./description.js";
 import { buildDefs, COMPONENT_REF_PREFIX, localize } from "./schema.js";
 import {
   HTTP_METHODS,
@@ -287,11 +287,7 @@ function resolveToolName(
   usedNames: Set<string>,
   nameMax: number,
 ): string {
-  // Prefix a name with its category when it would otherwise collide, and also
-  // when the operation name is pure CRUD boilerplate (`patch_one`): such a name
-  // carries no clue about what it acts on, so it cannot be found by searching.
-  const prefixed = baseCounts[entry.base] > 1 || isGenericName(entry.base);
-  const rawName = clampName(buildName(entry.category, entry.base, prefixed), nameMax);
+  const rawName = clampName(buildName(entry.category, entry.base, baseCounts[entry.base] > 1), nameMax);
   let name = rawName;
   for (let i = 2; usedNames.has(name); i++) {
     const suffix = `_${i}`;

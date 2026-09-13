@@ -214,17 +214,11 @@ gap in the server:
 ## How tools are named
 
 Each tool name is derived from the Mealie OpenAPI tag (category) and operation.
-Uniquely-named operations use their bare operation name (e.g. `suggest_recipes`).
-An operation name is prefixed with its category when it is either:
-
-* **reused across resources** — the CRUD verbs `get_all`, `get_one`,
-  `create_one`, `update_one`, `delete_one`, … — so names stay unique and grouped; or
-* **pure CRUD boilerplate** (`patch_one`, `create_many`, `test_one`), which says
-  nothing about *what* it acts on and so cannot be found by searching for the
-  resource. These become `recipe_crud_patch_one`,
-  `households_shopping_list_items_create_many`, `households_webhooks_test_one`, …
-
-All names are kept well under the 64-character tool-name limit. For example:
+Uniquely-named operations use their bare operation name (e.g. `suggest_recipes`);
+operations whose name is reused across resources (the CRUD verbs `get_all`,
+`get_one`, `create_one`, `update_one`, `delete_one`, …) are prefixed with their
+category to stay unique and to keep them grouped. All names are kept well under
+the 64-character tool-name limit. For example:
 
 | Tool | Method & path |
 | --- | --- |
@@ -252,8 +246,8 @@ HTTP method.
 Patch One — Recipe: CRUD. Partially update recipe.
 [PATCH /api/recipes/{slug}]
 Updates a recipe by existing slug and data.
-Keywords: recipe_crud_patch_one, recipe crud patch one, patch recipe, update recipe,
-edit recipe, modify recipe, change recipe, write recipe, recipe, recipes, recipe crud,
+Keywords: patch_one, patch one, patch recipe, update recipe, edit recipe,
+modify recipe, change recipe, write recipe, recipe, recipes, recipe crud,
 patch, update, edit, modify, change, write, mealie.
 ```
 
@@ -263,6 +257,11 @@ patch, update, edit, modify, change, write, mealie.
 | Route | The literal `[METHOD /path]`, which clients do match on |
 | Detail | The spec's own prose, when it has any |
 | Keywords | The tool's own name, its category and tag, the resource in both singular and plural, and every verb that means the same thing as the HTTP method |
+
+Because the keyword line carries the tool's own name, even a terse name like
+`patch_one` is findable by name — no tool has to be renamed to become
+searchable, so existing `MEALIE_TOOLS` filters and client allow-lists keep
+working.
 
 The generated text also spells out words Mealie writes as a single token
 (`mealplans` → *meal plans*), so meal-plan tools are findable by the words a
