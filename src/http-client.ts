@@ -35,6 +35,7 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const RETRY_BASE_DELAY_MS = 250;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 // Every part used to go out as a typeless Blob, which multipart serializes as
 // `application/octet-stream` — so an uploaded JPEG announced itself as opaque
@@ -250,7 +251,46 @@ async function buildMultipart(
 }
 
 async function readImageBody(res: Response, contentType: string): Promise<{ blocks: ContentBlock[]; raw: string }> {
-  const buf = Buffer.from(await res.arrayBuffer());
+  const contentLength = res.headers.get("content-length");
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!isNaN(size) && size > MAX_IMAGE_SIZE) {
+      return {
+        blocks: [text(`Image size (${size} bytes) exceeds maximum allowed size of 10MB.`)],
+        raw: `[image ${contentType} ${size} bytes - exceeds maximum size]`,
+      };
+    }
+  }
+
+  let buf: Buffer;
+  if (res.body) {
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_IMAGE_SIZE) {
+        await reader.cancel();
+        return {
+          blocks: [text(`Image size exceeds maximum allowed size of 10MB.`)],
+          raw: `[image ${contentType} >10MB - exceeds maximum size]`,
+        };
+      }
+      chunks.push(value);
+    }
+    buf = Buffer.concat(chunks, totalBytes);
+  } else {
+    buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_IMAGE_SIZE) {
+      return {
+        blocks: [text(`Image size (${buf.length} bytes) exceeds maximum allowed size of 10MB.`)],
+        raw: `[image ${contentType} ${buf.length} bytes - exceeds maximum size]`,
+      };
+    }
+  }
+
   const semiIndex = contentType.indexOf(";");
   const mimeType = semiIndex === -1 ? contentType : contentType.slice(0, semiIndex);
   return {
