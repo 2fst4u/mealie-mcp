@@ -544,6 +544,69 @@ test("handles image response", async () => {
   assert.equal(imgBlock.data, Buffer.from("image_data").toString("base64"));
 });
 
+test("rejects image response exceeding maximum size based on Content-Length header", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/image",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "content-type": "image/jpeg",
+        "content-length": "15728640",
+      },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /Image size \(15728640 bytes\) exceeds maximum allowed size of 10MB/);
+});
+
+test("rejects streamed image response exceeding maximum size during stream read", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/image",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  const hugeChunk = new Uint8Array(11 * 1024 * 1024);
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(hugeChunk);
+      controller.close();
+    },
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-type": "image/png" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /Image size exceeds maximum allowed size of 10MB/);
+});
+
 test("formats and truncates JSON response", async () => {
   const tool: MealieTool = {
     name: "test_tool",
