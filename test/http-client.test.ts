@@ -189,6 +189,39 @@ test("sends multipart body and reads local files", async () => {
   assert.ok(text.includes('"name": "mealie-mcp"'));
 });
 
+test("ignores undefined and null values when building multipart form body", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "put",
+    path: "/api/recipes/upload",
+    pathParams: [],
+    queryParams: [],
+    body: { kind: "multipart", required: true, fileFields: ["image"] },
+    deprecated: false,
+  };
+
+  let capturedBody: any;
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, init: RequestInit | undefined) => {
+    capturedBody = init?.body;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(
+    { ...dummyConfig, allowedUploadDirs: [process.cwd()] },
+    tool,
+    { body: { title: "My Recipe", optionalNotes: undefined, extra: null } },
+    dummyAuth
+  );
+
+  assert.ok(capturedBody instanceof FormData);
+  assert.equal(capturedBody.get("title"), "My Recipe");
+  assert.equal(capturedBody.get("optionalNotes"), null);
+  assert.equal(capturedBody.get("extra"), null);
+});
+
 test("sanitizes the filename sent in a multipart body", async () => {
   const tool: MealieTool = {
     name: "test_tool",
