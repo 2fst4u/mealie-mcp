@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import { createTokenProvider } from "./auth.js";
 import { loadOpenApi } from "./openapi-loader.js";
-import { filterTools, generateTools, hiddenCategories } from "./tools.js";
+import { filterTools, generateTools, hiddenCategories, type MealieTool as Tool } from "./tools.js";
 import { createServer, SERVER_NAME } from "./server.js";
 
 function log(message: string): void {
@@ -29,31 +29,20 @@ async function readVersion(): Promise<string> {
   }
 }
 
-async function main(): Promise<void> {
-  const config = loadConfig();
-  const auth = createTokenProvider(config);
-
-  // The version read and the authenticated spec load are independent, so overlap
-  // them. The token provider ensures a permission-scoped live spec is fetched.
-  const [version, { doc, source }] = await Promise.all([readVersion(), loadOpenApi(config, auth)]);
-  const allTools = generateTools(doc, config.toolNameMax);
-  const tools = filterTools(allTools, config);
-
-  if (tools.length === 0) {
-    log("Warning: no tools matched your include/exclude filters. The server will expose nothing.");
+/** Log details about the active authentication configuration. */
+function logAuthConfig(config: Config): void {
+  if (config.oauth) {
+    log("Auth: OAuth2 client credentials (access token fetched from the IdP).");
+    if (config.token) log("Note: MEALIE_API_TOKEN is ignored because OAuth is configured.");
+  } else if (config.token) {
+    log("Auth: static MEALIE_API_TOKEN.");
+  } else {
+    log("No credentials set — only unauthenticated endpoints will succeed.");
   }
+}
 
-  // ⚡ Bolt: Use for...of to initialize the Set instead of Set(arr.map(...))
-  // to avoid intermediate array allocations overhead.
-  const categories = new Set<string>();
-  for (const t of tools) categories.add(t.category);
-
-  log(`${SERVER_NAME} v${version}`);
-  log(`Mealie: ${config.baseUrl} | spec: ${source} (${doc.info?.version ?? "unknown"} version)`);
-  log(`Exposing ${tools.length}/${allTools.length} tools across ${categories.size} categories.`);
-
-  // Name what the user's own settings removed. A filter that quietly drops a
-  // whole category looks like a missing feature from the client side.
+/** Log any categories that were hidden due to user filters or read-only mode. */
+function logHiddenCategories(allTools: Tool[], config: Config): void {
   const hidden = hiddenCategories(allTools, config);
   if (hidden.filters.length > 0) {
     const vars: string[] = [];
@@ -68,14 +57,45 @@ async function main(): Promise<void> {
       `MEALIE_READ_ONLY hides ${hidden.readOnly.length} write-only categories: ${listCategories(hidden.readOnly, config.debug)}.`,
     );
   }
-  if (config.oauth) {
-    log("Auth: OAuth2 client credentials (access token fetched from the IdP).");
-    if (config.token) log("Note: MEALIE_API_TOKEN is ignored because OAuth is configured.");
-  } else if (config.token) {
-    log("Auth: static MEALIE_API_TOKEN.");
-  } else {
-    log("No credentials set — only unauthenticated endpoints will succeed.");
+}
+
+/** Log summary information about the server, loaded OpenAPI spec, tools, and auth. */
+function logStartupSummary(
+  version: string,
+  config: Config,
+  source: string,
+  specVersion: string,
+  tools: Tool[],
+  allTools: Tool[],
+): void {
+  if (tools.length === 0) {
+    log("Warning: no tools matched your include/exclude filters. The server will expose nothing.");
   }
+
+  // ⚡ Bolt: Use for...of to initialize the Set instead of Set(arr.map(...))
+  // to avoid intermediate array allocations overhead.
+  const categories = new Set<string>();
+  for (const t of tools) categories.add(t.category);
+
+  log(`${SERVER_NAME} v${version}`);
+  log(`Mealie: ${config.baseUrl} | spec: ${source} (${specVersion} version)`);
+  log(`Exposing ${tools.length}/${allTools.length} tools across ${categories.size} categories.`);
+
+  logHiddenCategories(allTools, config);
+  logAuthConfig(config);
+}
+
+async function main(): Promise<void> {
+  const config = loadConfig();
+  const auth = createTokenProvider(config);
+
+  // The version read and the authenticated spec load are independent, so overlap
+  // them. The token provider ensures a permission-scoped live spec is fetched.
+  const [version, { doc, source }] = await Promise.all([readVersion(), loadOpenApi(config, auth)]);
+  const allTools = generateTools(doc, config.toolNameMax);
+  const tools = filterTools(allTools, config);
+
+  logStartupSummary(version, config, source, doc.info?.version ?? "unknown", tools, allTools);
 
   const server = createServer(config, tools, version, auth);
   const transport = new StdioServerTransport();
