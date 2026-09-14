@@ -51,8 +51,8 @@ function walkRefs(
     if (name) onRef(name, obj);
   }
 
-  for (const key of Object.keys(obj)) {
-    if (key === "$ref") continue;
+  for (const key in obj) {
+    if (key === "$ref" || !Object.prototype.hasOwnProperty.call(obj, key)) continue;
     walkRefs(obj[key], onRef);
   }
 }
