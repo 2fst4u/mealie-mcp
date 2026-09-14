@@ -345,10 +345,29 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
   }
 
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
-  const buf = Buffer.from(await res.arrayBuffer());
+  let length: number;
+  const contentLength = res.headers.get("content-length");
+  const parsedLength = contentLength ? Number.parseInt(contentLength, 10) : NaN;
+
+  if (Number.isFinite(parsedLength) && parsedLength >= 0) {
+    length = parsedLength;
+    await res.body?.cancel();
+  } else if (res.body) {
+    let count = 0;
+    const reader = res.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) count += value.length;
+    }
+    length = count;
+  } else {
+    length = (await res.arrayBuffer()).byteLength;
+  }
+
   return {
-    blocks: [text(`Received ${buf.length} bytes of binary data (${contentType || "unknown type"}).`)],
-    raw: `[binary ${buf.length} bytes]`,
+    blocks: [text(`Received ${length} bytes of binary data (${contentType || "unknown type"}).`)],
+    raw: `[binary ${length} bytes]`,
   };
 }
 

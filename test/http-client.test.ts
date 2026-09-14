@@ -764,7 +764,7 @@ test("handles non-JSON text/yaml response", async () => {
   assert.equal(txt, "key: value");
 });
 
-test("handles arbitrary binary response", async () => {
+test("handles arbitrary binary response using content-length header", async () => {
   const tool: MealieTool = {
     name: "test_tool",
     description: "",
@@ -778,16 +778,50 @@ test("handles arbitrary binary response", async () => {
   };
 
   mock.method(globalThis, "fetch", async () => {
-    return new Response(Buffer.from([0, 1, 2, 3]), {
+    return new Response(null, {
       status: 200,
-      headers: { "content-type": "application/pdf" },
+      headers: { "content-type": "application/pdf", "content-length": "1048576" },
     });
   });
 
   const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
   assert.equal(res.content[0].type, "text");
   const txt = (res.content[0] as {text: string}).text;
-  assert.ok(txt.includes("Received 4 bytes of binary data"));
+  assert.ok(txt.includes("Received 1048576 bytes of binary data"));
+});
+
+test("handles arbitrary binary response without content-length header via streaming", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/download-stream",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2, 3]));
+      controller.enqueue(new Uint8Array([4, 5]));
+      controller.close();
+    },
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/zip" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as {text: string}).text;
+  assert.ok(txt.includes("Received 5 bytes of binary data"));
 });
 
 test("handles network error", async () => {
