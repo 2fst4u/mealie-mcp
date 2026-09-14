@@ -206,6 +206,8 @@ export async function readUpload(
   return { filePath, blob: await openAsBlob(realPath, { type }) };
 }
 
+const NOOP = (): void => {};
+
 async function buildMultipart(
   config: Config,
   tool: MealieTool,
@@ -222,7 +224,7 @@ async function buildMultipart(
   const operations = await Promise.all(
     Object.keys(body).map(async (key) => {
       const value = body[key];
-      if (value === undefined || value === null) return () => {};
+      if (value === undefined || value === null) return NOOP;
       if (fileFields.has(key)) {
         const paths = Array.isArray(value) ? value : [value];
         const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
