@@ -146,6 +146,29 @@ function scalar(value: unknown): string {
  * not resolve (typo, not mounted) are dropped rather than throwing: a bad entry
  * must never widen the allowlist, and dropping it can only narrow.
  */
+const RESOLVED_ALLOWED_DIRS_CACHE = Symbol("resolvedAllowedDirsCache");
+
+interface ConfigWithCache extends Config {
+  [RESOLVED_ALLOWED_DIRS_CACHE]?: {
+    dirs: string[];
+    resolved: Promise<string[]>;
+  };
+}
+
+export function getResolvedAllowedDirs(config: Config): Promise<string[]> {
+  const cfg = config as ConfigWithCache;
+  const cache = cfg[RESOLVED_ALLOWED_DIRS_CACHE];
+  if (cache && cache.dirs === config.allowedUploadDirs) {
+    return cache.resolved;
+  }
+  const resolved = resolveAllowedDirs(config.allowedUploadDirs);
+  cfg[RESOLVED_ALLOWED_DIRS_CACHE] = {
+    dirs: config.allowedUploadDirs,
+    resolved,
+  };
+  return resolved;
+}
+
 export async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
   const resolved = await Promise.all(
     dirs.map(async (dir) => {
@@ -214,7 +237,7 @@ async function buildMultipart(
   const fileFields = tool._fileFieldsSet ?? new Set(tool.body?.fileFields ?? []);
   // SECURITY: Fail closed. If no upload directories are explicitly allowed,
   // uploads are refused to prevent arbitrary local file reads.
-  const allowedDirs = await resolveAllowedDirs(config.allowedUploadDirs);
+  const allowedDirs = await getResolvedAllowedDirs(config);
 
   // ⚡ Bolt: Process files concurrently to overlap I/O latency, but return
   // synchronous closures to execute sequentially and preserve append order.

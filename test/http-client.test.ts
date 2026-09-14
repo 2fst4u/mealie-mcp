@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
+import { executeTool, getResolvedAllowedDirs, readUpload, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1035,4 +1035,25 @@ test("resolveAllowedDirs realpaths valid entries and gives them a trailing separ
   const real = await fs.realpath(tmpdir());
   const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
   assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("getResolvedAllowedDirs caches result for identical allowedUploadDirs array", async () => {
+  const config: Config = { ...dummyConfig, allowedUploadDirs: [tmpdir()] };
+  const p1 = getResolvedAllowedDirs(config);
+  const p2 = getResolvedAllowedDirs(config);
+  assert.strictEqual(p1, p2);
+  const res = await p1;
+  const real = await fs.realpath(tmpdir());
+  assert.deepEqual(res, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("getResolvedAllowedDirs invalidates cache when allowedUploadDirs reference changes", async () => {
+  const config: Config = { ...dummyConfig, allowedUploadDirs: [tmpdir()] };
+  const p1 = getResolvedAllowedDirs(config);
+  config.allowedUploadDirs = [process.cwd()];
+  const p2 = getResolvedAllowedDirs(config);
+  assert.notStrictEqual(p1, p2);
+  const res2 = await p2;
+  const realCwd = await fs.realpath(process.cwd());
+  assert.deepEqual(res2, [realCwd.endsWith(sep) ? realCwd : realCwd + sep]);
 });
