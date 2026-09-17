@@ -12,7 +12,12 @@ on:
       - ".github/workflows/**"
 
 jobs:
+  # Gate: must pass before anything else in this workflow runs.
+  empty-commit-check:
+    uses: ./.github/workflows/empty-commit-check.yml
+
   test:
+    needs: empty-commit-check
     name: Build & test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:

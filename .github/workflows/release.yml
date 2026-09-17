@@ -26,7 +26,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate: must pass before anything else in this workflow runs.
+  empty-commit-check:
+    uses: ./.github/workflows/empty-commit-check.yml
+
   release:
+    needs: empty-commit-check
     name: Build, release & publish
     runs-on: ubuntu-latest
     steps:
