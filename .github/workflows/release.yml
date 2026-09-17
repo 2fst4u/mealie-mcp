@@ -4,13 +4,20 @@ on:
   push:
     branches:
       - main
-    # Doc-only changes shouldn't cut a release. If a push to main touches ONLY
-    # these paths, the whole workflow is skipped — no version bump, no publish.
+    # A push that cannot change the published package shouldn't cut a release.
+    # npm ships only `dist` (compiled from src/), openapi.snapshot.json,
+    # README.md and LICENSE — see "files" in package.json — so documentation
+    # and repository tooling are skipped here. `.github/**` matters in
+    # particular: without it a CI-only change publishes a version (v0.2.105
+    # was cut by a workflow-only commit). If a push to main touches ONLY these
+    # paths, the whole workflow is skipped — no version bump, no publish.
     # A push that changes any other file still runs.
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - "LICENSE"
+      - ".github/**"
+      - ".gitignore"
 
 # Trusted Publishing (OIDC) needs `id-token: write`; bumping the version and
 # pushing the commit + tag and creating the release need `contents: write`.
