@@ -256,7 +256,11 @@ export function buildDescription(
 
   // Only the spec's free-form prose is allowed to overflow, so the keyword line
   // (the part a search index needs most) is never the thing that gets cut.
-  const budget = MAX_DESCRIPTION - fixed.reduce((n, part) => n + part.length + 1, 0);
+  let fixedLength = 0;
+  for (let i = 0; i < fixed.length; i++) {
+    fixedLength += fixed[i].length + 1;
+  }
+  const budget = MAX_DESCRIPTION - fixedLength;
   if (budget <= 0) return fixed.join("\n");
   const trimmed = detail.length > budget ? `${detail.slice(0, Math.max(0, budget - 3))}...` : detail;
   return [lead, route, trimmed, keywords].join("\n");
