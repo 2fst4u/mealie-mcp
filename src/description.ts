@@ -166,9 +166,14 @@ function actionFor(method: HttpMethod, path: string, resource: Resource): Action
   return METHOD_ACTIONS[listsMany(method, path, resource) ? "get:collection" : "get:item"]!;
 }
 
+const TAG_PUNCTUATION_REGEX = /[:_-]+/g;
+const WHITESPACE_REGEX = /\s+/g;
+
 /** Flatten a tag ("Recipe: CRUD") into plain searchable words ("recipe crud"). */
 function tagWords(tag: string): string {
-  return expandCompounds(tag.replace(/[:_-]+/g, " ").replace(/\s+/g, " ").trim().toLowerCase());
+  return expandCompounds(
+    tag.replace(TAG_PUNCTUATION_REGEX, " ").replace(WHITESPACE_REGEX, " ").trim().toLowerCase()
+  );
 }
 
 function addKeyword(seen: Set<string>, out: string[], value: string): void {
