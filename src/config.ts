@@ -91,12 +91,7 @@ function parseBaseUrl(env: NodeJS.ProcessEnv): string {
     );
   }
   const baseUrl = rawBase.replace(/\/+$/, "");
-  try {
-    // Fail fast with a clear message rather than surfacing a cryptic
-    // ERR_INVALID_URL later, on the first spec fetch or tool call.
-    // eslint-disable-next-line no-new
-    new URL(baseUrl);
-  } catch {
+  if (!URL.canParse(baseUrl)) {
     throw new Error(
       `MEALIE_BASE_URL is not a valid URL: ${JSON.stringify(rawBase)}. ` +
         "Use an absolute URL including the scheme, e.g. https://mealie.example.com.",
