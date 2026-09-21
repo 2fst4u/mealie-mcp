@@ -860,7 +860,7 @@ test("fetch is called with redirect: 'error' to prevent token leakage", async ()
   };
 
   let capturedOptions: any;
-  mock.method(globalThis, "fetch", async (url: string | URL | Request, options: any) => {
+  mock.method(globalThis, "fetch", async (_url: string | URL | Request, options: any) => {
     capturedOptions = options;
     return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
   });
