@@ -36,6 +36,7 @@ const RETRY_BASE_DELAY_MS = 250;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_RESPONSE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_BINARY_SIZE = 50 * 1024 * 1024; // 50MB
 
 // Every part used to go out as a typeless Blob, which multipart serializes as
@@ -302,8 +303,47 @@ async function readImageBody(res: Response, contentType: string): Promise<{ bloc
   };
 }
 
-async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+async function readTextRaw(res: Response): Promise<{ raw: string; exceeded: boolean }> {
+  const contentLength = res.headers.get("content-length");
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!isNaN(size) && size > MAX_RESPONSE_SIZE) {
+      await res.body?.cancel();
+      return { raw: `[response content length (${size} bytes) exceeds maximum size of 10MB]`, exceeded: true };
+    }
+  }
+
+  if (res.body) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let totalBytes = 0;
+    let raw = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_SIZE) {
+        await reader.cancel();
+        return { raw: `[response size exceeds maximum allowed size of 10MB]`, exceeded: true };
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    return { raw, exceeded: false };
+  }
+
   const raw = await res.text();
+  if (raw.length > MAX_RESPONSE_SIZE) {
+    return { raw: `[response size exceeds maximum allowed size of 10MB]`, exceeded: true };
+  }
+  return { raw, exceeded: false };
+}
+
+async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+  const { raw, exceeded } = await readTextRaw(res);
+  if (exceeded) {
+    return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
+  }
   // ⚡ Bolt: Avoid expensive parsing and stringifying if the result is going
   // to be heavily truncated anyway. MAX_TEXT * 5 is an arbitrary threshold
   // indicating the raw JSON is already huge (e.g. 500KB+).
@@ -319,7 +359,10 @@ async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; ra
 }
 
 async function readTextBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
-  const raw = await res.text();
+  const { raw, exceeded } = await readTextRaw(res);
+  if (exceeded) {
+    return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
+  }
   return { blocks: [text(truncate(raw))], raw };
 }
 

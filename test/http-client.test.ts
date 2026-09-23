@@ -738,6 +738,69 @@ test("handles invalid JSON response gracefully", async () => {
   assert.equal(txt, "{ invalid json }");
 });
 
+test("rejects text response exceeding maximum size based on Content-Length header", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/huge-text",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "content-type": "text/plain",
+        "content-length": "15728640",
+      },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /Response size exceeds maximum allowed size of 10MB/);
+});
+
+test("rejects streamed text response exceeding maximum size during stream read", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/huge-text-stream",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  const hugeChunk = new Uint8Array(11 * 1024 * 1024);
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(hugeChunk);
+      controller.close();
+    },
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-type": "text/plain" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+  assert.match(txt, /Response size exceeds maximum allowed size of 10MB/);
+});
+
 test("handles non-JSON text/yaml response", async () => {
   const tool: MealieTool = {
     name: "test_tool",
