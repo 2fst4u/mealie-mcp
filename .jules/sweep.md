@@ -20,3 +20,7 @@ Code health convention: Prefer `for...of` loops for simple array iteration to im
 ## 2023-11-09 - Unused TypeScript mock parameters
 **Learning:** In TypeScript tests, especially when mocking library functions like `fetch`, parameters that are required by the mocked type signature but unused in the mock implementation can trigger `noUnusedParameters` compiler errors if strictly configured.
 **Action:** Always verify test files are clear of unused parameter errors by running `npx tsc -p tsconfig.test.json --noUnusedLocals --noUnusedParameters`. When cleaning up unused parameters in mocks, safely rename them by prefixing with an underscore (`_`) or completely remove trailing parameters if they aren't needed.
+
+## 2026-08-17 - Native openAsBlob vs Duck-Typed Blobs
+**Learning:** `openAsBlob` in Node.js returns a true native `Blob` instance backed by file descriptors. Replacing `openAsBlob` with custom JS duck-typed objects causes WebIDL brand-check failures in native `fetch` and `FormData`.
+**Action:** Retain `openAsBlob` from `node:fs` for native file-backed streaming `Blob` creation.
