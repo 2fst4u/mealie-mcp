@@ -94,18 +94,31 @@ export function singularize(word: string): string {
 }
 
 function expandCompounds(phrase: string): string {
-  return phrase
-    .split(" ")
-    .map((w) => COMPOUND_WORDS[w] ?? w)
-    .join(" ");
+  if (!phrase.includes(" ")) {
+    return COMPOUND_WORDS[phrase] ?? phrase;
+  }
+  const words = phrase.split(" ");
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!;
+    const compound = COMPOUND_WORDS[w];
+    if (compound !== undefined) {
+      words[i] = compound;
+    }
+  }
+  return words.join(" ");
 }
 
 /** Path segments that name something, dashes and dots normalised to spaces. */
 export function pathSegments(path: string): string[] {
-  return path
-    .split("/")
-    .filter((s) => s.length > 0 && s !== "api" && !s.startsWith("{"))
-    .map((s) => expandCompounds(s.replace(/[-_.]+/g, " ").toLowerCase()));
+  const rawSegments = path.split("/");
+  const result: string[] = [];
+  for (let i = 0; i < rawSegments.length; i++) {
+    const s = rawSegments[i]!;
+    if (s.length > 0 && s !== "api" && !s.startsWith("{")) {
+      result.push(expandCompounds(s.replace(/[-_.]+/g, " ").toLowerCase()));
+    }
+  }
+  return result;
 }
 
 export interface Resource {
