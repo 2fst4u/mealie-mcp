@@ -36,6 +36,7 @@ const RETRY_BASE_DELAY_MS = 250;
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_BINARY_SIZE = 50 * 1024 * 1024; // 50MB
 
 // Every part used to go out as a typeless Blob, which multipart serializes as
 // `application/octet-stream` — so an uploaded JPEG announced itself as opaque
@@ -346,6 +347,7 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
 
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
   let length: number;
+  let truncated = false;
   const contentLength = res.headers.get("content-length");
   const parsedLength = contentLength ? Number.parseInt(contentLength, 10) : NaN;
 
@@ -358,16 +360,25 @@ async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: s
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (value) count += value.length;
+      if (value) {
+        count += value.length;
+        if (count > MAX_BINARY_SIZE) {
+          truncated = true;
+          await reader.cancel();
+          break;
+        }
+      }
     }
     length = count;
   } else {
     length = (await res.arrayBuffer()).byteLength;
   }
 
+  const lengthDisplay = truncated ? `>${MAX_BINARY_SIZE}` : `${length}`;
+
   return {
-    blocks: [text(`Received ${length} bytes of binary data (${contentType || "unknown type"}).`)],
-    raw: `[binary ${length} bytes]`,
+    blocks: [text(`Received ${lengthDisplay} bytes of binary data (${contentType || "unknown type"}).`)],
+    raw: `[binary ${lengthDisplay} bytes]`,
   };
 }
 
