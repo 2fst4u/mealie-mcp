@@ -387,7 +387,7 @@ test("uploads every file when a file field holds an array of paths", async () =>
 test("reports an unreadable upload path instead of a bare filesystem error", async () => {
   await assert.rejects(
     () => executeTool(dummyConfig, uploadTool, { body: { image: "/definitely/not/here.png" } }, dummyAuth),
-    /Upload failed: cannot read \/definitely\/not\/here\.png/,
+    /Upload failed: \/definitely\/not\/here\.png is outside MEALIE_ALLOWED_UPLOAD_DIRS\./,
   );
 });
 
@@ -482,10 +482,9 @@ test("refuses a symlink that escapes an allowed directory", async () => {
     const link = join(allowed, "innocent.png");
     await fs.symlink(outside, link);
     const config = { ...dummyConfig, allowedUploadDirs: [allowed] };
-    const realOutside = await fs.realpath(outside);
     await assert.rejects(
       () => executeTool(config, uploadTool, { body: { image: link } }, dummyAuth),
-      new Error(`Upload failed: ${link} resolves to ${realOutside}, which is outside MEALIE_ALLOWED_UPLOAD_DIRS.`),
+      new Error(`Upload failed: ${link} is outside MEALIE_ALLOWED_UPLOAD_DIRS.`),
     );
   });
 });

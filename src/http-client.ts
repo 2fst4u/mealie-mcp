@@ -172,18 +172,17 @@ export async function readUpload(
   let realPath: string;
   try {
     realPath = await realpath(filePath);
-  } catch (err) {
-    // SECURITY: Do not expose raw filesystem error messages (e.g., ENOENT, EACCES) to prevent Sensitive Data Exposure.
-    // Paths here come from a model, so restate the error in terms of the upload it broke
-    // without leaking sensitive system path details.
-    throw new Error(`Upload failed: cannot read ${filePath}`);
+  } catch {
+    // SECURITY: Do not expose raw filesystem error messages or leak file existence/resolution details.
+    throw new Error(
+      `Upload failed: ${filePath} is outside MEALIE_ALLOWED_UPLOAD_DIRS.`,
+    );
   }
 
   if (!allowedDirs.some((dir) => (realPath + sep).startsWith(dir))) {
-    // Deliberately reports the real path: when a symlink is what pushed the
-    // upload out of bounds, naming only the link makes the refusal baffling.
+    // SECURITY: Return a uniform error message without leaking real path or file existence.
     throw new Error(
-      `Upload failed: ${filePath} resolves to ${realPath}, which is outside MEALIE_ALLOWED_UPLOAD_DIRS.`,
+      `Upload failed: ${filePath} is outside MEALIE_ALLOWED_UPLOAD_DIRS.`,
     );
   }
 

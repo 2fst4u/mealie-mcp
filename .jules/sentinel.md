@@ -45,6 +45,11 @@ Ensure error handling logic only includes safe, sanitized, or strictly controlle
 **Learning:** Defaulting configurations to 'unrestricted' when empty allows for accidental exposure of local filesystem out-of-the-box, increasing risk of Local File Inclusion / Arbitrary File Read.
 **Prevention:** Always 'fail closed'. By default, sensitive features like local filesystem access should be disabled (refuse all) until explicitly enabled via a strictly-configured allowlist.
 
+## 2026-08-03 - Prevent Filesystem Probing in Upload Validation Errors
+**Vulnerability:** Information disclosure via filesystem probing. Throwing different error messages when a requested upload file does not exist vs. when it exists but lies outside allowed upload directories (or disclosing resolved symlink real paths) allows attackers to verify file existence and discover internal filesystem structures.
+**Learning:** Error messages during file validation must be uniform regardless of whether a file fails realpath resolution or fails allowlist boundary checks.
+**Prevention:** Return a single uniform error message (e.g. `Upload failed: ${filePath} is outside MEALIE_ALLOWED_UPLOAD_DIRS.`) for both missing files and out-of-bounds files, without disclosing internal real paths in error messages.
+
 ## 2026-08-01 - Sanitize outbound multipart filenames
 **Vulnerability:** The multipart filename sent to Mealie was `basename(filePath)` verbatim. `basename()` strips directory components, so this is not a traversal hole on its own, but it does forward whatever else the on-disk name contains — control characters, quotes, and characters that are illegal in a filename on the receiving end.
 **Learning:** Path containment and filename safety are separate concerns. The allowlist and `realpath()` check decide *which file* may be read; they say nothing about whether the *name* is safe to hand to another system that may write it to disk or echo it into a header.
