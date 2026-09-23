@@ -148,17 +148,26 @@ function scalar(value: unknown): string {
  * must never widen the allowlist, and dropping it can only narrow.
  */
 export async function resolveAllowedDirs(dirs: string[]): Promise<string[]> {
-  const resolved = await Promise.all(
-    dirs.map(async (dir) => {
-      try {
-        const real = await realpath(dir);
-        return real.endsWith(sep) ? real : real + sep;
-      } catch {
-        return undefined;
-      }
-    }),
-  );
-  return resolved.filter((dir): dir is string => dir !== undefined);
+  const len = dirs.length;
+  if (len === 0) return [];
+
+  const promises: Promise<string | undefined>[] = new Array(len);
+  for (let i = 0; i < len; i++) {
+    promises[i] = realpath(dirs[i]).then(
+      (real) => (real.endsWith(sep) ? real : real + sep),
+      () => undefined,
+    );
+  }
+
+  const resolved = await Promise.all(promises);
+  const result: string[] = [];
+  for (let i = 0; i < len; i++) {
+    const dir = resolved[i];
+    if (dir !== undefined) {
+      result.push(dir);
+    }
+  }
+  return result;
 }
 
 export async function readUpload(
