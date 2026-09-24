@@ -98,7 +98,7 @@ All configuration is via environment variables.
 | `MEALIE_OAUTH_SCOPE` | – | — | Optional space-delimited OAuth scopes. |
 | `MEALIE_OAUTH_AUDIENCE` | – | — | Optional OAuth audience (some IdPs, e.g. Auth0, need it to mint a Mealie-targeted token). |
 | `MEALIE_READ_ONLY` | – | `false` | When `true`, only expose `GET` endpoints. Great for a safe, read-only assistant. |
-| `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category slugs to expose (e.g. `recipe,households_shopping_lists`). Empty = the full safe baseline. |
+| `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category slugs to expose (e.g. `recipe_crud,households_shopping_lists`). Empty = the full safe baseline. |
 | `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category slugs to hide further (e.g. `groups_seeders,groups_migrations`). Applied on top of the always-on baseline trim. |
 | `MEALIE_USE_BUNDLED_SPEC` | – | `false` | Skip the live OpenAPI fetch and use the snapshot bundled with the package. |
 | `MEALIE_OPENAPI_URL` | – | `${MEALIE_BASE_URL}/openapi.json` | Override where the OpenAPI schema is fetched from. |
@@ -190,14 +190,14 @@ names). Examples:
 
 ```bash
 # Only recipes, meal plans and shopping lists:
-MEALIE_TOOLS="recipe,households_mealplans,households_shopping_lists"
+MEALIE_TOOLS="recipe_crud,households_mealplans,households_shopping_lists"
 
 # Baseline, but also drop group seeders + migrations:
 MEALIE_EXCLUDE_TOOLS="groups_seeders,groups_migrations"
 
 # Read-only recipe browsing assistant:
 MEALIE_READ_ONLY=true
-MEALIE_TOOLS="recipe,explore"
+MEALIE_TOOLS="recipe_crud,explore_recipes"
 ```
 
 On startup the server names any category your settings hide completely, so a
