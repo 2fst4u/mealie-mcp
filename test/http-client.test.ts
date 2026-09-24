@@ -887,6 +887,41 @@ test("handles arbitrary binary response without content-length header via stream
   assert.ok(txt.includes("Received 5 bytes of binary data"));
 });
 
+test("cancels binary stream reading early if size exceeds MAX_BINARY_SIZE", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/download-large-binary",
+    pathParams: [],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  const chunk = new Uint8Array(26 * 1024 * 1024); // 26MB
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(chunk);
+      controller.enqueue(chunk); // 52MB total (> 50MB)
+      controller.close();
+    },
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/octet-stream" },
+    });
+  });
+
+  const res = await executeTool(dummyConfig, tool, {}, dummyAuth);
+  assert.equal(res.content[0].type, "text");
+  const txt = (res.content[0] as { text: string }).text;
+  assert.ok(txt.includes("Received >52428800 bytes of binary data"));
+});
+
 test("handles network error", async () => {
   const tool: MealieTool = {
     name: "test_tool",
