@@ -4,6 +4,6 @@
 ## 2026-09-03 - Documenting category slug examples
 **Learning:** The `README.md` example for `MEALIE_TOOLS` filtering used `households_shopping`, which is an incomplete prefix and not a valid category slug. This ambiguity could cause confusion since the actual categories are `households_shopping_lists` and `households_shopping_list_items`.
 **Action:** Ensure any examples showing category slugs use exact, valid categories (e.g. `households_shopping_lists`) that match the OpenAPI snapshot.
-## 2024-10-24 - Exact category slugs in configuration examples
-**Learning:** Examples in `README.md` and `.env.example` that use incomplete prefixes (e.g., `recipe`, `explore`) for tool filtering contradict the documentation's instruction to use "exact category slugs," leading to ambiguity and user confusion. Even if the codebase supports prefix matching, documentation examples should favor explicit, exact category slugs to avoid drift and maintain clarity.
-**Action:** Ensure all documentation examples for configuration variables like `MEALIE_TOOLS` use exact, valid categories (e.g., `recipe_crud`, `explore_recipes`) verified against the OpenAPI specification.
+## 2026-09-25 - Category filters match by prefix
+**Learning:** `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` entries match a category exactly *or* as a `_`-bounded prefix (`matches()` in `src/tools.ts`, covered by `test/tools.test.ts`). The `recipe` and `explore` examples are deliberate: they select every `recipe_*` / `explore_*` category. Rewriting them to a single exact slug silently narrows what the example exposes.
+**Action:** Before "correcting" a filter example, check `matches()`; document the prefix behaviour rather than removing it from the examples.
