@@ -186,7 +186,9 @@ groups are **permanently excluded** — they can't be re-enabled by configuratio
 
 You can **narrow further** from this baseline — but not widen past it — with
 `MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` using **category slugs** (or exact tool
-names). Examples:
+names). An entry also matches every category it prefixes at a `_` boundary, so
+`recipe` covers all the `recipe_*` categories (`recipe_crud`, `recipe_comments`,
+`recipe_timeline`, …) and `explore` all the `explore_*` ones. Examples:
 
 ```bash
 # Only recipes, meal plans and shopping lists:
