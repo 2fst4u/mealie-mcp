@@ -254,7 +254,10 @@ async function buildMultipart(
   return form;
 }
 
-async function readImageBody(res: Response, contentType: string): Promise<{ blocks: ContentBlock[]; raw: string }> {
+type BodyResult = { blocks: ContentBlock[]; raw: string };
+type SendResult = { res: Response; body: BodyResult };
+
+async function readImageBody(res: Response, contentType: string): Promise<BodyResult> {
   const contentLength = res.headers.get("content-length");
   if (contentLength) {
     const size = parseInt(contentLength, 10);
@@ -339,7 +342,7 @@ async function readTextRaw(res: Response): Promise<{ raw: string; exceeded: bool
   return { raw, exceeded: false };
 }
 
-async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+async function readJsonBody(res: Response): Promise<BodyResult> {
   const { raw, exceeded } = await readTextRaw(res);
   if (exceeded) {
     return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
@@ -358,7 +361,7 @@ async function readJsonBody(res: Response): Promise<{ blocks: ContentBlock[]; ra
   }
 }
 
-async function readTextBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+async function readTextBody(res: Response): Promise<BodyResult> {
   const { raw, exceeded } = await readTextRaw(res);
   if (exceeded) {
     return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
@@ -366,7 +369,7 @@ async function readTextBody(res: Response): Promise<{ blocks: ContentBlock[]; ra
   return { blocks: [text(truncate(raw))], raw };
 }
 
-async function readBody(res: Response): Promise<{ blocks: ContentBlock[]; raw: string }> {
+async function readBody(res: Response): Promise<BodyResult> {
   const contentType = res.headers.get("content-type") ?? "";
 
   if (res.status === 204 || res.headers.get("content-length") === "0") {
@@ -459,7 +462,7 @@ async function performRequest(
   method: string,
   headers: Record<string, string>,
   payload: string | URLSearchParams | FormData | undefined,
-): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> {
+): Promise<SendResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   try {
@@ -478,23 +481,48 @@ async function performRequest(
   }
 }
 
+async function sendWithAuthRefresh(
+  config: Config,
+  send: (forceRefresh: boolean) => Promise<SendResult>,
+): Promise<SendResult> {
+  const result = await send(false);
+  // A 401 may mean the OAuth access token expired mid-flight; force one refresh and retry.
+  if (result.res.status === 401 && isRefreshable(config)) {
+    return await send(true);
+  }
+  return result;
+}
+
+function formatHttpResponse(
+  method: string,
+  toolPath: string,
+  res: Response,
+  bodyResult: BodyResult,
+): ToolResult {
+  const { blocks } = bodyResult;
+  if (!res.ok) {
+    const detail = blocks.map((b) => (b.type === "text" ? b.text : "[binary]")).join("\n");
+    return {
+      content: [text(`HTTP ${res.status} ${res.statusText} from ${method} ${toolPath}\n${detail}`)],
+      isError: true,
+    };
+  }
+  return { content: blocks };
+}
+
 async function executeWithRetry(
   config: Config,
   tool: MealieTool,
   url: string,
   method: string,
   maxAttempts: number,
-  send: (forceRefresh: boolean) => Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }>,
+  send: (forceRefresh: boolean) => Promise<SendResult>,
 ): Promise<ToolResult> {
   for (let attempt = 1; ; attempt++) {
     let res: Response;
-    let bodyResult: { blocks: ContentBlock[]; raw: string };
+    let bodyResult: BodyResult;
     try {
-      ({ res, body: bodyResult } = await send(false));
-      // A 401 may mean the OAuth access token expired mid-flight; force one refresh and retry.
-      if (res.status === 401 && isRefreshable(config)) {
-        ({ res, body: bodyResult } = await send(true));
-      }
+      ({ res, body: bodyResult } = await sendWithAuthRefresh(config, send));
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       if (attempt < maxAttempts) {
@@ -516,16 +544,7 @@ async function executeWithRetry(
       continue;
     }
 
-    const { blocks } = bodyResult;
-    if (!res.ok) {
-      const detail = blocks.map((b) => (b.type === "text" ? b.text : "[binary]")).join("\n");
-      return {
-        content: [text(`HTTP ${res.status} ${res.statusText} from ${method} ${tool.path}\n${detail}`)],
-        isError: true,
-      };
-    }
-
-    return { content: blocks };
+    return formatHttpResponse(method, tool.path, res, bodyResult);
   }
 }
 
@@ -542,7 +561,7 @@ export async function executeTool(
 
   const payload = await buildPayload(config, tool, args, baseHeaders);
 
-  const send = async (forceRefresh: boolean): Promise<{ res: Response; body: { blocks: ContentBlock[]; raw: string } }> => {
+  const send = async (forceRefresh: boolean): Promise<SendResult> => {
     const headers = { ...baseHeaders };
     const authValue = await auth.authHeader(forceRefresh);
     if (authValue) headers.Authorization = authValue;
