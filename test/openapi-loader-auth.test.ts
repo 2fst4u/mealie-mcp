@@ -71,6 +71,75 @@ test("logs an error and fetches spec unauthenticated when TokenProvider.authHead
   }
 });
 
+test("fetches spec unauthenticated when baseUrl is an invalid URL", async () => {
+  const original = globalThis.fetch;
+  let authorization: string | null = null;
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    return {
+      ok: true,
+      status: 200,
+      statusText: "",
+      json: async () => ({ paths: { "/live": {} }, info: { title: "Live" } }),
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const config = makeConfig({ token: "test-token", baseUrl: "not-a-valid-url" });
+    const result = await loadOpenApi(config, createTokenProvider(config));
+    assert.equal(result.source, "live");
+    assert.equal(authorization, null);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("fetches spec unauthenticated when openapiUrl is an invalid URL", async () => {
+  const original = globalThis.fetch;
+  let authorization: string | null = null;
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    return {
+      ok: true,
+      status: 200,
+      statusText: "",
+      json: async () => ({ paths: { "/live": {} }, info: { title: "Live" } }),
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const config = makeConfig({ token: "test-token", openapiUrl: "invalid-openapi-url" });
+    const result = await loadOpenApi(config, createTokenProvider(config));
+    assert.equal(result.source, "live");
+    assert.equal(authorization, null);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("sends credentials when openapiUrl has the same origin as baseUrl", async () => {
+  const original = globalThis.fetch;
+  let authorization: string | null = null;
+  globalThis.fetch = (async (_url: string | URL, init?: RequestInit) => {
+    authorization = new Headers(init?.headers).get("authorization");
+    return {
+      ok: true,
+      status: 200,
+      statusText: "",
+      json: async () => ({ paths: { "/live": {} }, info: { title: "Live" } }),
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const config = makeConfig({ token: "test-token", baseUrl: "https://mealie.example.com", openapiUrl: "https://mealie.example.com/custom/openapi.json" });
+    const result = await loadOpenApi(config, createTokenProvider(config));
+    assert.equal(result.source, "live");
+    assert.equal(authorization, "Bearer test-token");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("logs an error and fetches spec unauthenticated when TokenProvider.authHeader throws a non-Error value", async () => {
   const originalFetch = globalThis.fetch;
   const originalStderr = process.stderr.write;
