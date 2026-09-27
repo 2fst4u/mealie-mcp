@@ -223,6 +223,9 @@ async function buildMultipart(
 
   // ⚡ Bolt: Process files concurrently to overlap I/O latency, but return
   // synchronous closures to execute sequentially and preserve append order.
+  // The three branches stay inline: each is a few lines, and keeping them next
+  // to the ordering logic above is what makes that contract readable. Moving
+  // them into helpers only adds a `form` parameter to thread (declined in #219).
   const operations = await Promise.all(
     Object.keys(body).map(async (key) => {
       const value = body[key];
@@ -269,6 +272,10 @@ async function readImageBody(res: Response, contentType: string): Promise<BodyRe
     }
   }
 
+  // SECURITY: the size cap is enforced inline in both branches so each early
+  // return is visible next to the read it guards. Splitting the reads into
+  // helpers means returning `Buffer | BodyResult` and discriminating with
+  // `Buffer.isBuffer`, which makes the limit harder to audit (declined in #224).
   let buf: Buffer;
   if (res.body) {
     const reader = res.body.getReader();

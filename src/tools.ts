@@ -448,6 +448,10 @@ export function hiddenCategories(
   config: Config,
 ): { readOnly: string[]; filters: string[] } {
   const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
+  // Two `filter` passes on purpose: this runs once at startup over a few
+  // hundred tools, so fusing them into one loop saves nothing measurable and
+  // hides the offered ⊇ readable relationship the two lines state (declined
+  // in #221).
   const offered = all.filter((t) => !matches(t, hardExcludeConditions));
   const readable = config.readOnly ? offered.filter((t) => t.method === "get") : offered;
   return {
