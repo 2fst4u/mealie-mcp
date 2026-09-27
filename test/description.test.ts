@@ -7,6 +7,7 @@ import {
   buildDescription,
   buildHeadline,
   buildKeywords,
+  pathSegments,
   resourceNoun,
   singularize,
 } from "../src/description.js";
@@ -18,6 +19,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 async function loadSnapshot(): Promise<OpenApiDocument> {
   return JSON.parse(await readFile(join(here, "..", "openapi.snapshot.json"), "utf8")) as OpenApiDocument;
 }
+
+test("pathSegments extracts, normalizes, and expands REST path segments", () => {
+  assert.deepEqual(pathSegments("/api/recipes/{slug}"), ["recipes"]);
+  assert.deepEqual(pathSegments("/api/households/mealplans/{id}"), ["households", "meal plans"]);
+  assert.deepEqual(pathSegments("/api/shopping_lists/items-test.v1/{item_id}"), [
+    "shopping lists",
+    "items test v1",
+  ]);
+  assert.deepEqual(pathSegments("//api///mealplanner//"), ["meal planner"]);
+});
 
 test("singularize handles the plural shapes REST paths use", () => {
   assert.equal(singularize("recipes"), "recipe");
