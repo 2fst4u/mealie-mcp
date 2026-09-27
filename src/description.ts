@@ -102,10 +102,13 @@ function expandCompounds(phrase: string): string {
 
 /** Path segments that name something, dashes and dots normalised to spaces. */
 export function pathSegments(path: string): string[] {
-  return path
-    .split("/")
-    .filter((s) => s.length > 0 && s !== "api" && !s.startsWith("{"))
-    .map((s) => expandCompounds(s.replace(/[-_.]+/g, " ").toLowerCase()));
+  const result: string[] = [];
+  for (const s of path.split("/")) {
+    if (s.length > 0 && s !== "api" && !s.startsWith("{")) {
+      result.push(expandCompounds(s.replace(/[-_.]+/g, " ").toLowerCase()));
+    }
+  }
+  return result;
 }
 
 export interface Resource {
