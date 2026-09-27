@@ -100,7 +100,13 @@ function expandCompounds(phrase: string): string {
     .join(" ");
 }
 
-/** Path segments that name something, dashes and dots normalised to spaces. */
+/**
+ * Path segments that name something, dashes and dots normalised to spaces.
+ *
+ * Kept as `filter`/`map` on purpose: a path has a handful of segments and this
+ * runs once per operation at startup, so a hand-rolled loop saves nothing
+ * measurable and reads worse (declined in #222).
+ */
 export function pathSegments(path: string): string[] {
   return path
     .split("/")
