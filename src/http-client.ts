@@ -210,6 +210,31 @@ export async function readUpload(
 
 const NOOP = (): void => {};
 
+async function processFileField(
+  key: string,
+  value: unknown,
+  allowedDirs: string[],
+): Promise<(form: FormData) => void> {
+  const paths = Array.isArray(value) ? value : [value];
+  const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
+  return (form: FormData) => {
+    for (const { filePath, blob } of files) {
+      form.append(key, blob, sanitizeFilename(basename(filePath)));
+    }
+  };
+}
+
+function processScalarField(key: string, value: unknown): (form: FormData) => void {
+  if (Array.isArray(value)) {
+    return (form: FormData) => {
+      for (const item of value) form.append(key, scalar(item));
+    };
+  }
+  return (form: FormData) => {
+    form.append(key, scalar(value));
+  };
+}
+
 async function buildMultipart(
   config: Config,
   tool: MealieTool,
@@ -228,27 +253,14 @@ async function buildMultipart(
       const value = body[key];
       if (value === undefined || value === null) return NOOP;
       if (fileFields.has(key)) {
-        const paths = Array.isArray(value) ? value : [value];
-        const files = await Promise.all(paths.map((p) => readUpload(String(p), allowedDirs)));
-        return () => {
-          for (const { filePath, blob } of files) {
-            form.append(key, blob, sanitizeFilename(basename(filePath)));
-          }
-        };
-      } else if (Array.isArray(value)) {
-        return () => {
-          for (const item of value) form.append(key, scalar(item));
-        };
-      } else {
-        return () => {
-          form.append(key, scalar(value));
-        };
+        return processFileField(key, value, allowedDirs);
       }
+      return processScalarField(key, value);
     })
   );
 
   for (const apply of operations) {
-    apply();
+    apply(form);
   }
 
   return form;
