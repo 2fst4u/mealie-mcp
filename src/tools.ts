@@ -448,8 +448,20 @@ export function hiddenCategories(
   config: Config,
 ): { readOnly: string[]; filters: string[] } {
   const hardExcludeConditions = buildConditions(HARD_EXCLUDE);
-  const offered = all.filter((t) => !matches(t, hardExcludeConditions));
-  const readable = config.readOnly ? offered.filter((t) => t.method === "get") : offered;
+  const offered: MealieTool[] = [];
+  const readable: MealieTool[] = [];
+  const isReadOnly = config.readOnly;
+
+  for (let i = 0; i < all.length; i++) {
+    const t = all[i];
+    if (!matches(t, hardExcludeConditions)) {
+      offered.push(t);
+      if (!isReadOnly || t.method === "get") {
+        readable.push(t);
+      }
+    }
+  }
+
   return {
     readOnly: lostCategories(offered, categoriesOf(readable)),
     filters: lostCategories(readable, categoriesOf(filterTools(all, config))),
