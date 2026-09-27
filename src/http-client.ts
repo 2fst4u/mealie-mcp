@@ -254,6 +254,43 @@ async function buildMultipart(
   return form;
 }
 
+async function readImageStream(
+  stream: ReadableStream<Uint8Array>,
+  contentType: string,
+): Promise<Buffer | { blocks: ContentBlock[]; raw: string }> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.byteLength;
+    if (totalBytes > MAX_IMAGE_SIZE) {
+      await reader.cancel();
+      return {
+        blocks: [text("Image size exceeds maximum allowed size of 10MB.")],
+        raw: `[image ${contentType} >10MB - exceeds maximum size]`,
+      };
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, totalBytes);
+}
+
+async function readImageArrayBuffer(
+  res: Response,
+  contentType: string,
+): Promise<Buffer | { blocks: ContentBlock[]; raw: string }> {
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > MAX_IMAGE_SIZE) {
+    return {
+      blocks: [text(`Image size (${buf.length} bytes) exceeds maximum allowed size of 10MB.`)],
+      raw: `[image ${contentType} ${buf.length} bytes - exceeds maximum size]`,
+    };
+  }
+  return buf;
+}
+
 async function readImageBody(res: Response, contentType: string): Promise<{ blocks: ContentBlock[]; raw: string }> {
   const contentLength = res.headers.get("content-length");
   if (contentLength) {
@@ -266,40 +303,19 @@ async function readImageBody(res: Response, contentType: string): Promise<{ bloc
     }
   }
 
-  let buf: Buffer;
-  if (res.body) {
-    const reader = res.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let totalBytes = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_IMAGE_SIZE) {
-        await reader.cancel();
-        return {
-          blocks: [text(`Image size exceeds maximum allowed size of 10MB.`)],
-          raw: `[image ${contentType} >10MB - exceeds maximum size]`,
-        };
-      }
-      chunks.push(value);
-    }
-    buf = Buffer.concat(chunks, totalBytes);
-  } else {
-    buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > MAX_IMAGE_SIZE) {
-      return {
-        blocks: [text(`Image size (${buf.length} bytes) exceeds maximum allowed size of 10MB.`)],
-        raw: `[image ${contentType} ${buf.length} bytes - exceeds maximum size]`,
-      };
-    }
+  const readResult = res.body
+    ? await readImageStream(res.body, contentType)
+    : await readImageArrayBuffer(res, contentType);
+
+  if (!Buffer.isBuffer(readResult)) {
+    return readResult;
   }
 
   const semiIndex = contentType.indexOf(";");
   const mimeType = semiIndex === -1 ? contentType : contentType.slice(0, semiIndex);
   return {
-    blocks: [{ type: "image", data: buf.toString("base64"), mimeType }],
-    raw: `[image ${contentType} ${buf.length} bytes]`,
+    blocks: [{ type: "image", data: readResult.toString("base64"), mimeType }],
+    raw: `[image ${contentType} ${readResult.length} bytes]`,
   };
 }
 
