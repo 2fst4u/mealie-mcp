@@ -261,16 +261,17 @@ export function buildDescription(
   const route = `[${method.toUpperCase()} ${path}]`;
   const keywords = `Keywords: ${buildKeywords(op, path, method, name, category).join(", ")}.`;
 
-  // ⚡ Bolt: Using string concatenation instead of array.join() avoids unnecessary array allocations.
-  const fixed = lead + "\n" + route + "\n" + keywords;
+  // NOTE (Jules): array + join() is intentional. Replacing it with string concatenation (PR #228)
+  // was rejected: this runs once per tool at startup, so the speedup is irrelevant and the
+  // array form keeps the length-budget arithmetic below readable.
+  const fixed = [lead, route, keywords];
   const detail = op.description?.trim();
-  if (!detail || detail === op.summary) return fixed;
+  if (!detail || detail === op.summary) return fixed.join("\n");
 
   // Only the spec's free-form prose is allowed to overflow, so the keyword line
   // (the part a search index needs most) is never the thing that gets cut.
-  // The '3' accounts for the three newline characters in the final string.
-  const budget = MAX_DESCRIPTION - (lead.length + route.length + keywords.length + 3);
-  if (budget <= 0) return fixed;
+  const budget = MAX_DESCRIPTION - fixed.reduce((n, part) => n + part.length + 1, 0);
+  if (budget <= 0) return fixed.join("\n");
   const trimmed = detail.length > budget ? `${detail.slice(0, Math.max(0, budget - 3))}...` : detail;
-  return lead + "\n" + route + "\n" + trimmed + "\n" + keywords;
+  return [lead, route, trimmed, keywords].join("\n");
 }
