@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
+import { executeTool, mimeTypeFor, readUpload, resolveAllowedDirs } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1263,4 +1263,51 @@ test("resolveAllowedDirs realpaths valid entries and gives them a trailing separ
   const real = await fs.realpath(tmpdir());
   const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
   assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("mimeTypeFor resolves expected MIME types for supported file extensions", () => {
+  assert.equal(mimeTypeFor("image.png"), "image/png");
+  assert.equal(mimeTypeFor("image.jpg"), "image/jpeg");
+  assert.equal(mimeTypeFor("image.jpeg"), "image/jpeg");
+  assert.equal(mimeTypeFor("image.webp"), "image/webp");
+  assert.equal(mimeTypeFor("image.avif"), "image/avif");
+  assert.equal(mimeTypeFor("image.bmp"), "image/bmp");
+  assert.equal(mimeTypeFor("image.gif"), "image/gif");
+  assert.equal(mimeTypeFor("image.heic"), "image/heic");
+  assert.equal(mimeTypeFor("image.svg"), "image/svg+xml");
+  assert.equal(mimeTypeFor("image.tif"), "image/tiff");
+  assert.equal(mimeTypeFor("image.tiff"), "image/tiff");
+
+  assert.equal(mimeTypeFor("doc.pdf"), "application/pdf");
+  assert.equal(mimeTypeFor("data.json"), "application/json");
+  assert.equal(mimeTypeFor("config.yaml"), "application/yaml");
+  assert.equal(mimeTypeFor("config.yml"), "application/yaml");
+  assert.equal(mimeTypeFor("archive.zip"), "application/zip");
+  assert.equal(mimeTypeFor("data.xml"), "application/xml");
+
+  assert.equal(mimeTypeFor("table.csv"), "text/csv");
+  assert.equal(mimeTypeFor("page.html"), "text/html");
+  assert.equal(mimeTypeFor("readme.md"), "text/markdown");
+  assert.equal(mimeTypeFor("notes.txt"), "text/plain");
+});
+
+test("mimeTypeFor handles case-insensitivity in extensions", () => {
+  assert.equal(mimeTypeFor("PHOTO.PNG"), "image/png");
+  assert.equal(mimeTypeFor("photo.JpG"), "image/jpeg");
+  assert.equal(mimeTypeFor("Document.PDF"), "application/pdf");
+  assert.equal(mimeTypeFor("Data.JSON"), "application/json");
+});
+
+test("mimeTypeFor handles complex file paths and multiple dots", () => {
+  assert.equal(mimeTypeFor("/path/to/my.recipe.final.json"), "application/json");
+  assert.equal(mimeTypeFor("C:\\Users\\Chef\\Images\\dish.v1.2.PNG"), "image/png");
+  assert.equal(mimeTypeFor("../relative/folder/archive.tar.gz.zip"), "application/zip");
+});
+
+test("mimeTypeFor falls back to application/octet-stream for unknown or missing extensions", () => {
+  assert.equal(mimeTypeFor("archive.7z"), "application/octet-stream");
+  assert.equal(mimeTypeFor("data.unknown"), "application/octet-stream");
+  assert.equal(mimeTypeFor("Dockerfile"), "application/octet-stream");
+  assert.equal(mimeTypeFor(".gitignore"), "application/octet-stream");
+  assert.equal(mimeTypeFor("file_without_ext"), "application/octet-stream");
 });
