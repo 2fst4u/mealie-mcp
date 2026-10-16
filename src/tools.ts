@@ -63,7 +63,7 @@ function operationName(operationId: string | undefined, path: string, method: st
 }
 
 /** Collapse immediately repeated tokens, e.g. `recipe_recipe_get` -> `recipe_get`. */
-function dedupeTokens(name: string): string {
+export function dedupeTokens(name: string): string {
   const parts = name.split("_");
   let result = "";
   let last = "";
