@@ -1251,6 +1251,37 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
   }
 });
 
+test("debugLog sanitizes sensitive query parameters in URL logs", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/test",
+    pathParams: [],
+    queryParams: [{ name: "secret", isArray: false }],
+    deprecated: false,
+  };
+
+  let stderrOutput = "";
+  mock.method(process.stderr, "write", (msg: string) => {
+    stderrOutput += msg;
+    return true;
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const debugConfig: Config = { ...dummyConfig, debug: true };
+  await executeTool(debugConfig, tool, { secret: "supersecret" }, dummyAuth);
+
+  assert.ok(stderrOutput.includes("https://api.example.com/api/test"));
+  assert.equal(stderrOutput.includes("supersecret"), false, "stderr should not contain sensitive query param values");
+  assert.equal(stderrOutput.includes("secret="), false, "stderr should not contain query parameter string");
+});
+
 test("resolveAllowedDirs drops non-existent paths", async () => {
   const dirs = await resolveAllowedDirs(["/path/does/not/exist/12345", "/another/bad/path"]);
   assert.deepEqual(dirs, []);
