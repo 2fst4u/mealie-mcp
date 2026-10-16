@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
+import { executeTool, readUpload, resolveAllowedDirs, sanitizeFilename } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1263,4 +1263,17 @@ test("resolveAllowedDirs realpaths valid entries and gives them a trailing separ
   const real = await fs.realpath(tmpdir());
   const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
   assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("sanitizeFilename handles valid, path traversal, illegal, and dot-only inputs", () => {
+  assert.equal(sanitizeFilename("recipe.json"), "recipe.json");
+  assert.equal(sanitizeFilename("my-photo_123.jpg"), "my-photo_123.jpg");
+  assert.equal(sanitizeFilename("../recipe.json"), ".._recipe.json");
+  assert.equal(sanitizeFilename("a/b\\c:d*e?f\"g<h>i|j.txt"), "a_b_c_d_e_f_g_h_i_j.txt");
+  assert.equal(sanitizeFilename("file\x00\x1F\x7Fname.png"), "file___name.png");
+  assert.equal(sanitizeFilename("."), "upload.bin");
+  assert.equal(sanitizeFilename(".."), "upload.bin");
+  assert.equal(sanitizeFilename("..."), "upload.bin");
+  assert.equal(sanitizeFilename(""), "upload.bin");
+  assert.equal(sanitizeFilename("rezept_öäü.pdf"), "rezept_öäü.pdf");
 });
