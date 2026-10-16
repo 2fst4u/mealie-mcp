@@ -42,23 +42,23 @@ export interface MealieTool {
   _fileFieldsSet?: Set<string>;
 }
 
-const NON_ALPHANUMERIC_REGEX = /[^a-z0-9]+/g;
-const LEADING_TRAILING_UNDERSCORES_REGEX = /^_+|_+$/g;
-const NON_WORD_REGEX = /\W/g;
-const MULTIPLE_UNDERSCORES_REGEX = /_+/g;
-const TRAILING_UNDERSCORES_REGEX = /_+$/;
-
-function slug(value: string): string {
+/**
+ * Regex literals stay inline on purpose: V8 compiles each literal once and
+ * caches it, and the naming helpers run once per operation at startup, so
+ * hoisting them into module-scoped constants saves nothing measurable and
+ * separates each pattern from the one line that uses it (declined in #229).
+ */
+export function slug(value: string): string {
   return value
     .toLowerCase()
-    .replace(NON_ALPHANUMERIC_REGEX, "_")
-    .replace(LEADING_TRAILING_UNDERSCORES_REGEX, "");
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 /** Strip the FastAPI-generated `<path>_<method>` suffix off an operationId. */
 function operationName(operationId: string | undefined, path: string, method: string): string {
   if (!operationId) return `${method}_${slug(path)}`;
-  const suffix = `${path.replace(NON_WORD_REGEX, "_")}_${method}`;
+  const suffix = `${path.replace(/\W/g, "_")}_${method}`;
   return operationId.endsWith(suffix) ? operationId.slice(0, -suffix.length) : operationId;
 }
 
@@ -80,7 +80,7 @@ function dedupeTokens(name: string): string {
 
 function nameParts(op: OpenApiOperation, path: string, method: string): { category: string; base: string } {
   const category = slug(op.tags?.[0] ?? "misc");
-  const base = dedupeTokens(operationName(op.operationId, path, method).replace(MULTIPLE_UNDERSCORES_REGEX, "_"));
+  const base = dedupeTokens(operationName(op.operationId, path, method).replace(/_+/g, "_"));
   return { category, base };
 }
 
@@ -90,14 +90,14 @@ function nameParts(op: OpenApiOperation, path: string, method: string): { catego
  * (e.g. `get_all`, `create_one`) are prefixed with their category to stay unique.
  */
 function buildName(category: string, base: string, prefixed: boolean): string {
-  const name = prefixed ? dedupeTokens(`${category}_${base}`.replace(MULTIPLE_UNDERSCORES_REGEX, "_")) : base;
+  const name = prefixed ? dedupeTokens(`${category}_${base}`.replace(/_+/g, "_")) : base;
   return name || "tool";
 }
 
 /** Truncate a name to `max` chars without leaving a dangling underscore. */
 function clampName(name: string, max: number): string {
   if (name.length <= max) return name;
-  return name.slice(0, max).replace(TRAILING_UNDERSCORES_REGEX, "") || name.slice(0, max);
+  return name.slice(0, max).replace(/_+$/, "") || name.slice(0, max);
 }
 
 /** Does a parameter schema permit an array value (so we repeat the query key)? */
