@@ -42,6 +42,12 @@ export interface MealieTool {
   _fileFieldsSet?: Set<string>;
 }
 
+/**
+ * Regex literals stay inline on purpose: V8 compiles each literal once and
+ * caches it, and the naming helpers run once per operation at startup, so
+ * hoisting them into module-scoped constants saves nothing measurable and
+ * separates each pattern from the one line that uses it (declined in #229).
+ */
 export function slug(value: string): string {
   return value
     .toLowerCase()
