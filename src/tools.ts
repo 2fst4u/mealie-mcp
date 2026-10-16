@@ -42,7 +42,7 @@ export interface MealieTool {
   _fileFieldsSet?: Set<string>;
 }
 
-function slug(value: string): string {
+export function slug(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")

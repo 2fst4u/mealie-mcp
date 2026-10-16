@@ -12,6 +12,7 @@ import {
   resolveSchema,
   schemaAllowsArray,
   dedupeTokens,
+  slug,
   type MealieTool,
 } from "../src/tools.js";
 import { makeConfig } from "./helpers.js";
@@ -306,4 +307,29 @@ test("dedupeTokens collapses immediately repeated tokens and handles edge cases"
 
   // Empty string
   assert.equal(dedupeTokens(""), "");
+});
+
+test("slug string formatter sanitizes strings correctly", () => {
+  // Lowercase conversion
+  assert.equal(slug("HelloWorld"), "helloworld");
+
+  // Basic string unchanged
+  assert.equal(slug("hello_world"), "hello_world");
+
+  // Replacing spaces and punctuation with underscores
+  assert.equal(slug("Hello World!"), "hello_world");
+
+  // Collapsing consecutive special characters/underscores
+  assert.equal(slug("foo --- bar !!! baz"), "foo_bar_baz");
+
+  // Trimming leading and trailing underscores/special characters
+  assert.equal(slug("---hello world---"), "hello_world");
+  assert.equal(slug("_foo_bar_"), "foo_bar");
+
+  // Handling numbers and mixed characters
+  assert.equal(slug("Recipe #123 (V2)"), "recipe_123_v2");
+
+  // Edge cases
+  assert.equal(slug(""), "");
+  assert.equal(slug("!!! ###"), "");
 });
