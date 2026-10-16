@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
+import { executeTool, readUpload, resolveAllowedDirs, scalar } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1263,4 +1263,23 @@ test("resolveAllowedDirs realpaths valid entries and gives them a trailing separ
   const real = await fs.realpath(tmpdir());
   const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
   assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("scalar correctly formats string inputs", () => {
+  assert.equal(scalar("hello"), "hello");
+  assert.equal(scalar(""), "");
+});
+
+test("scalar correctly formats primitive non-string inputs", () => {
+  assert.equal(scalar(123), "123");
+  assert.equal(scalar(0), "0");
+  assert.equal(scalar(true), "true");
+  assert.equal(scalar(false), "false");
+  assert.equal(scalar(undefined), "undefined");
+});
+
+test("scalar correctly formats object and array inputs as JSON string or null", () => {
+  assert.equal(scalar({ a: 1 }), '{"a":1}');
+  assert.equal(scalar([1, 2]), "[1,2]");
+  assert.equal(scalar(null), "null");
 });
