@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs, executeWithRetry, type SendResult, type BodyResult } from "../src/http-client.js";
+import { executeTool, readUpload, resolveAllowedDirs, executeWithRetry, sanitizeFilename, type SendResult, type BodyResult } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1514,4 +1514,17 @@ test("executeWithRetry: triggers auth refresh retry on 401 response when oauth c
   assert.deepEqual(forceRefreshCalls, [false, true]);
   assert.equal(res.isError, undefined);
   assert.equal((res.content[0] as { text: string }).text, "ok");
+});
+
+test("sanitizeFilename handles valid, path traversal, illegal, and dot-only inputs", () => {
+  assert.equal(sanitizeFilename("recipe.json"), "recipe.json");
+  assert.equal(sanitizeFilename("my-photo_123.jpg"), "my-photo_123.jpg");
+  assert.equal(sanitizeFilename("../recipe.json"), ".._recipe.json");
+  assert.equal(sanitizeFilename("a/b\\c:d*e?f\"g<h>i|j.txt"), "a_b_c_d_e_f_g_h_i_j.txt");
+  assert.equal(sanitizeFilename("file\x00\x1F\x7Fname.png"), "file___name.png");
+  assert.equal(sanitizeFilename("."), "upload.bin");
+  assert.equal(sanitizeFilename(".."), "upload.bin");
+  assert.equal(sanitizeFilename("..."), "upload.bin");
+  assert.equal(sanitizeFilename(""), "upload.bin");
+  assert.equal(sanitizeFilename("rezept_öäü.pdf"), "rezept_öäü.pdf");
 });
