@@ -425,7 +425,13 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  */
 export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
-const categoriesOf = (tools: MealieTool[]): Set<string> => new Set(tools.map((t) => t.category));
+const categoriesOf = (tools: MealieTool[]): Set<string> => {
+  const categories = new Set<string>();
+  for (const t of tools) {
+    categories.add(t.category);
+  }
+  return categories;
+};
 
 /** Categories of `from` that survive nowhere in `kept`, biggest loss first. */
 function lostCategories(from: MealieTool[], kept: Set<string>): string[] {
