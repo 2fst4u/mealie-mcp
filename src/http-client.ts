@@ -257,8 +257,8 @@ async function buildMultipart(
   return form;
 }
 
-type BodyResult = { blocks: ContentBlock[]; raw: string };
-type SendResult = { res: Response; body: BodyResult };
+export type BodyResult = { blocks: ContentBlock[]; raw: string };
+export type SendResult = { res: Response; body: BodyResult };
 
 async function readImageBody(res: Response, contentType: string): Promise<BodyResult> {
   const contentLength = res.headers.get("content-length");
@@ -517,7 +517,7 @@ function formatHttpResponse(
   return { content: blocks };
 }
 
-async function executeWithRetry(
+export async function executeWithRetry(
   config: Config,
   tool: MealieTool,
   url: string,

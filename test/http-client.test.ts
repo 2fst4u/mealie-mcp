@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, readUpload, resolveAllowedDirs } from "../src/http-client.js";
+import { executeTool, readUpload, resolveAllowedDirs, executeWithRetry, type SendResult, type BodyResult } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1263,4 +1263,140 @@ test("resolveAllowedDirs realpaths valid entries and gives them a trailing separ
   const real = await fs.realpath(tmpdir());
   const dirs = await resolveAllowedDirs([tmpdir(), "/path/does/not/exist/12345"]);
   assert.deepEqual(dirs, [real.endsWith(sep) ? real : real + sep]);
+});
+
+test("executeWithRetry: succeeds on first attempt without retrying", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    const res = new Response("ok", { status: 200, headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "ok" }], raw: "ok" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 3, dummySend);
+  assert.equal(callCount, 1);
+  assert.equal(res.isError, undefined);
+  assert.equal((res.content[0] as { text: string }).text, "ok");
+});
+
+test("executeWithRetry: retries on 500 status and succeeds on subsequent attempt", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    if (callCount === 1) {
+      const res = new Response("Internal Server Error", { status: 500, headers: { "content-type": "text/plain" } });
+      return { res, body: { blocks: [{ type: "text", text: "error" }], raw: "error" } };
+    }
+    const res = new Response("success", { status: 200, headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "success" }], raw: "success" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 2, dummySend);
+  assert.equal(callCount, 2);
+  assert.equal(res.isError, undefined);
+  assert.equal((res.content[0] as { text: string }).text, "success");
+});
+
+test("executeWithRetry: exhausts maxAttempts on 503 status and returns formatted error", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    const res = new Response("Service Unavailable", { status: 503, statusText: "Service Unavailable", headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "unavailable" }], raw: "unavailable" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 2, dummySend);
+  assert.equal(callCount, 2);
+  assert.equal(res.isError, true);
+  assert.match((res.content[0] as { text: string }).text, /HTTP 503 Service Unavailable/);
+});
+
+test("executeWithRetry: retries on network exception and succeeds", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    if (callCount === 1) {
+      throw new Error("Socket closed unexpectedly");
+    }
+    const res = new Response("data", { status: 200, headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "data" }], raw: "data" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 2, dummySend);
+  assert.equal(callCount, 2);
+  assert.equal(res.isError, undefined);
+  assert.equal((res.content[0] as { text: string }).text, "data");
+});
+
+test("executeWithRetry: exhausts maxAttempts on network exception and returns network error", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    throw new Error("Connection reset by peer");
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 2, dummySend);
+  assert.equal(callCount, 2);
+  assert.equal(res.isError, true);
+  assert.match((res.content[0] as { text: string }).text, /Request to GET https:\/\/api.example.com\/api\/data failed: Connection reset by peer/);
+});
+
+test("executeWithRetry: handles non-Error thrown exception during send", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    throw "String error message";
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 2, dummySend);
+  assert.equal(callCount, 2);
+  assert.equal(res.isError, true);
+  assert.match((res.content[0] as { text: string }).text, /Request to GET https:\/\/api.example.com\/api\/data failed: String error message/);
+});
+
+test("executeWithRetry: does not retry non-retryable status (400 Bad Request) despite maxAttempts > 1", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    const res = new Response("Bad Request", { status: 400, statusText: "Bad Request", headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "invalid input" }], raw: "invalid input" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 3, dummySend);
+  assert.equal(callCount, 1);
+  assert.equal(res.isError, true);
+  assert.match((res.content[0] as { text: string }).text, /HTTP 400 Bad Request/);
+});
+
+test("executeWithRetry: maxAttempts = 1 executes only once even on retryable 500 status", async () => {
+  let callCount = 0;
+  const dummySend = async (_forceRefresh: boolean): Promise<SendResult> => {
+    callCount++;
+    const res = new Response("Internal Error", { status: 500, statusText: "Internal Error", headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "err" }], raw: "err" } };
+  };
+
+  const res = await executeWithRetry(dummyConfig, getTool, "https://api.example.com/api/data", "GET", 1, dummySend);
+  assert.equal(callCount, 1);
+  assert.equal(res.isError, true);
+});
+
+test("executeWithRetry: triggers auth refresh retry on 401 response when oauth configured", async () => {
+  const forceRefreshCalls: boolean[] = [];
+  const dummySend = async (forceRefresh: boolean): Promise<SendResult> => {
+    forceRefreshCalls.push(forceRefresh);
+    if (!forceRefresh) {
+      const res = new Response("Unauthorized", { status: 401, headers: { "content-type": "text/plain" } });
+      return { res, body: { blocks: [{ type: "text", text: "unauthorized" }], raw: "unauthorized" } };
+    }
+    const res = new Response("ok", { status: 200, headers: { "content-type": "text/plain" } });
+    return { res, body: { blocks: [{ type: "text", text: "ok" }], raw: "ok" } };
+  };
+
+  const oauthConfig: Config = { ...dummyConfig, oauth: { tokenUrl: "http://idp", clientId: "c", clientSecret: "s" } };
+
+  const res = await executeWithRetry(oauthConfig, getTool, "https://api.example.com/api/data", "GET", 1, dummySend);
+  assert.deepEqual(forceRefreshCalls, [false, true]);
+  assert.equal(res.isError, undefined);
+  assert.equal((res.content[0] as { text: string }).text, "ok");
 });
