@@ -42,7 +42,7 @@ export interface MealieTool {
   _fileFieldsSet?: Set<string>;
 }
 
-function slug(value: string): string {
+export function slug(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
@@ -425,13 +425,10 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  */
 export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
-const categoriesOf = (tools: MealieTool[]): Set<string> => {
-  const categories = new Set<string>();
-  for (const t of tools) {
-    categories.add(t.category);
-  }
-  return categories;
-};
+// Kept as `new Set(tools.map(...))` on purpose: the tool list is built once at
+// startup, so the intermediate array costs nothing measurable and a hand-rolled
+// `for...of` loop only adds lines (declined in #237).
+const categoriesOf = (tools: MealieTool[]): Set<string> => new Set(tools.map((t) => t.category));
 
 /** Categories of `from` that survive nowhere in `kept`, biggest loss first. */
 function lostCategories(from: MealieTool[], kept: Set<string>): string[] {
