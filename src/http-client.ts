@@ -22,7 +22,7 @@ const MAX_TEXT = 100_000;
 // containment — the allowlist check in `readUpload` owns that. It is about not
 // forwarding a name Mealie has to cope with: control characters, quotes, and
 // characters that are illegal in a filename on the far side.
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   const safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
   // A name that was nothing but stripped characters, or only dots, is no name.
   return !safe || /^\.+$/.test(safe) ? "upload.bin" : safe;
@@ -257,8 +257,8 @@ async function buildMultipart(
   return form;
 }
 
-type BodyResult = { blocks: ContentBlock[]; raw: string };
-type SendResult = { res: Response; body: BodyResult };
+export type BodyResult = { blocks: ContentBlock[]; raw: string };
+export type SendResult = { res: Response; body: BodyResult };
 
 async function readImageBody(res: Response, contentType: string): Promise<BodyResult> {
   const contentLength = res.headers.get("content-length");
@@ -517,7 +517,7 @@ function formatHttpResponse(
   return { content: blocks };
 }
 
-async function executeWithRetry(
+export async function executeWithRetry(
   config: Config,
   tool: MealieTool,
   url: string,
