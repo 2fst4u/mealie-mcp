@@ -425,6 +425,9 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  */
 export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
+// Kept as `new Set(tools.map(...))` on purpose: the tool list is built once at
+// startup, so the intermediate array costs nothing measurable and a hand-rolled
+// `for...of` loop only adds lines (declined in #237).
 const categoriesOf = (tools: MealieTool[]): Set<string> => new Set(tools.map((t) => t.category));
 
 /** Categories of `from` that survive nowhere in `kept`, biggest loss first. */
