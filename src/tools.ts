@@ -42,6 +42,12 @@ export interface MealieTool {
   _fileFieldsSet?: Set<string>;
 }
 
+/**
+ * Regex literals stay inline on purpose: V8 compiles each literal once and
+ * caches it, and the naming helpers run once per operation at startup, so
+ * hoisting them into module-scoped constants saves nothing measurable and
+ * separates each pattern from the one line that uses it (declined in #229).
+ */
 export function slug(value: string): string {
   return value
     .toLowerCase()
@@ -57,7 +63,7 @@ function operationName(operationId: string | undefined, path: string, method: st
 }
 
 /** Collapse immediately repeated tokens, e.g. `recipe_recipe_get` -> `recipe_get`. */
-function dedupeTokens(name: string): string {
+export function dedupeTokens(name: string): string {
   const parts = name.split("_");
   let result = "";
   let last = "";
@@ -425,6 +431,9 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  */
 export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
+// Kept as `new Set(tools.map(...))` on purpose: the tool list is built once at
+// startup, so the intermediate array costs nothing measurable and a hand-rolled
+// `for...of` loop only adds lines (declined in #237).
 const categoriesOf = (tools: MealieTool[]): Set<string> => new Set(tools.map((t) => t.category));
 
 /** Categories of `from` that survive nowhere in `kept`, biggest loss first. */
