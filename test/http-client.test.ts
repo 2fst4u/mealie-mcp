@@ -1232,6 +1232,90 @@ test("preserves config.baseUrl subpaths when constructing URLs", async () => {
   assert.equal(capturedUrl, "https://api.example.com/mealie-subpath/api/data");
 });
 
+test("encodes path parameters containing special characters and slashes", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/users/{userId}/posts",
+    pathParams: ["userId"],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  let capturedUrl = "";
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
+    capturedUrl = url.toString();
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(dummyConfig, tool, { userId: "user/123 & special#1" }, dummyAuth);
+  assert.equal(capturedUrl, "https://api.example.com/api/users/user%2F123%20%26%20special%231/posts");
+});
+
+test("throws error if path parameter is null", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/users/{userId}",
+    pathParams: ["userId"],
+    queryParams: [],
+    deprecated: false,
+  };
+
+  await assert.rejects(
+    executeTool(dummyConfig, tool, { userId: null }, dummyAuth),
+    /Missing required path parameter: userId/
+  );
+});
+
+test("handles query parameters with scalar types (numbers, booleans, objects) and ignores null/undefined", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/items",
+    pathParams: [],
+    queryParams: [
+      { name: "count", isArray: false },
+      { name: "active", isArray: false },
+      { name: "meta", isArray: false },
+      { name: "nullVal", isArray: false },
+      { name: "undefVal", isArray: false },
+    ],
+    deprecated: false,
+  };
+
+  let capturedUrl = "";
+  mock.method(globalThis, "fetch", async (url: string | URL | Request) => {
+    capturedUrl = url.toString();
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  await executeTool(
+    dummyConfig,
+    tool,
+    {
+      count: 42,
+      active: true,
+      meta: { key: "val" },
+      nullVal: null,
+      undefVal: undefined,
+    },
+    dummyAuth
+  );
+
+  const expectedMeta = encodeURIComponent(JSON.stringify({ key: "val" }));
+  assert.equal(capturedUrl, `https://api.example.com/api/items?count=42&active=true&meta=${expectedMeta}`);
+});
+
 test("safeUrl securely strips credentials from valid URLs", () => {
   const url = "https://user:pass@example.com/api/data?query=123#hash";
   const safe = safeUrl(url);
@@ -1249,6 +1333,37 @@ test("safeUrl returns <invalid url> for unparseable strings", () => {
     const safe = safeUrl(str);
     assert.equal(safe, "<invalid url>");
   }
+});
+
+test("debugLog sanitizes sensitive query parameters in URL logs", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/test",
+    pathParams: [],
+    queryParams: [{ name: "secret", isArray: false }],
+    deprecated: false,
+  };
+
+  let stderrOutput = "";
+  mock.method(process.stderr, "write", (msg: string) => {
+    stderrOutput += msg;
+    return true;
+  });
+
+  mock.method(globalThis, "fetch", async () => {
+    return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  const debugConfig: Config = { ...dummyConfig, debug: true };
+  await executeTool(debugConfig, tool, { secret: "supersecret" }, dummyAuth);
+
+  assert.ok(stderrOutput.includes("https://api.example.com/api/test"));
+  assert.equal(stderrOutput.includes("supersecret"), false, "stderr should not contain sensitive query param values");
+  assert.equal(stderrOutput.includes("secret="), false, "stderr should not contain query parameter string");
 });
 
 test("resolveAllowedDirs drops non-existent paths", async () => {

@@ -20,7 +20,7 @@ async function loadBundled(): Promise<OpenApiDocument> {
   return JSON.parse(raw) as OpenApiDocument;
 }
 
-function sameOrigin(left: string, right: string): boolean {
+export function sameOrigin(left: string, right: string): boolean {
   try {
     return new URL(left).origin === new URL(right).origin;
   } catch {
