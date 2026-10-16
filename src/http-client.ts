@@ -534,19 +534,19 @@ export async function executeWithRetry(
       const reason = err instanceof Error ? err.message : String(err);
       if (attempt < maxAttempts) {
         const delay = backoffMs(attempt);
-        debugLog(config, `${method} ${tool.path} failed (${reason}); retrying in ${delay}ms`);
+        debugLog(config, `${method} ${safeUrl(url)} failed (${reason}); retrying in ${delay}ms`);
         await sleep(delay);
         continue;
       }
-      debugLog(config, `${method} ${tool.path} → network error: ${reason}`);
+      debugLog(config, `${method} ${safeUrl(url)} → network error: ${reason}`);
       return { content: [text(`Request to ${method} ${safeUrl(url)} failed: ${reason}`)], isError: true };
     }
 
-    debugLog(config, `${method} ${tool.path} → ${res.status}`);
+    debugLog(config, `${method} ${safeUrl(url)} → ${res.status}`);
 
     if (RETRYABLE_STATUS.has(res.status) && attempt < maxAttempts) {
       const delay = backoffMs(attempt);
-      debugLog(config, `${method} ${tool.path} → ${res.status}; retrying in ${delay}ms`);
+      debugLog(config, `${method} ${safeUrl(url)} → ${res.status}; retrying in ${delay}ms`);
       await sleep(delay);
       continue;
     }
