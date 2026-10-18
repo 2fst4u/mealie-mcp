@@ -41,6 +41,119 @@ test("server CallToolRequestSchema handler catches errors from executeTool", asy
   });
 });
 
+test("server CallToolRequestSchema handler executes tool successfully", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async (_url: string | URL | Request) => {
+      return new Response(JSON.stringify({ status: "ok" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+
+    const config: Config = { baseUrl: "http://example.com" } as any;
+    const tools: MealieTool[] = [{
+      name: "test_tool",
+      description: "A test tool",
+      method: "get",
+      path: "/api/test",
+      pathParams: [],
+      queryParams: [],
+      inputSchema: { type: "object" },
+      category: "test",
+      deprecated: false
+    }];
+    const auth = { authHeader: async () => "Bearer token" };
+
+    const server = createServer(config, tools, "1.0.0", auth as any);
+    const handler = (server as any)._requestHandlers.get("tools/call");
+
+    const response = await handler({
+      method: "tools/call",
+      params: { name: "test_tool", arguments: {} }
+    }, {} as any);
+
+    assert.deepEqual(response, {
+      content: [{ type: "text", text: '{\n  "status": "ok"\n}' }]
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("server CallToolRequestSchema handler handles undefined arguments", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async (_url: string | URL | Request) => {
+      return new Response(JSON.stringify({ status: "ok" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+
+    const config: Config = { baseUrl: "http://example.com" } as any;
+    const tools: MealieTool[] = [{
+      name: "test_tool",
+      description: "A test tool",
+      method: "get",
+      path: "/api/test",
+      pathParams: [],
+      queryParams: [],
+      inputSchema: { type: "object" },
+      category: "test",
+      deprecated: false
+    }];
+    const auth = { authHeader: async () => undefined };
+
+    const server = createServer(config, tools, "1.0.0", auth as any);
+    const handler = (server as any)._requestHandlers.get("tools/call");
+
+    const response = await handler({
+      method: "tools/call",
+      params: { name: "test_tool" }
+    }, {} as any);
+
+    assert.deepEqual(response, {
+      content: [{ type: "text", text: '{\n  "status": "ok"\n}' }]
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("server CallToolRequestSchema handler catches non-Error thrown exceptions", async () => {
+  const config = {
+    get baseUrl(): string {
+      throw "Custom string error";
+    }
+  } as unknown as Config;
+
+  const tools: MealieTool[] = [{
+    name: "test_tool",
+    description: "A test tool",
+    method: "get",
+    path: "/api/test",
+    pathParams: [],
+    queryParams: [],
+    inputSchema: { type: "object" },
+    category: "test",
+    deprecated: false
+  }];
+
+  const server = createServer(config, tools, "1.0.0", {} as any);
+  const handler = (server as any)._requestHandlers.get("tools/call");
+
+  const response = await handler({
+    method: "tools/call",
+    params: { name: "test_tool", arguments: {} }
+  }, {} as any);
+
+  assert.deepEqual(response, {
+    content: [{ type: "text", text: "Error executing test_tool: Custom string error" }],
+    isError: true,
+  });
+});
+
 test("server ListToolsRequestSchema handler returns tools", async () => {
   const config: Config = { baseUrl: "http://example.com" } as any;
   const tools: MealieTool[] = [{
