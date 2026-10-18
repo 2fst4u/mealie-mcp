@@ -391,6 +391,14 @@ test("reports an unreadable upload path instead of a bare filesystem error", asy
   );
 });
 
+test("readUpload throws obscured error when file path does not exist", async () => {
+  const nonExistentPath = join(tmpdir(), "non-existent-upload-file.txt");
+  await assert.rejects(
+    () => readUpload(nonExistentPath, [tmpdir()]),
+    new Error(`Upload failed: cannot read ${nonExistentPath}`),
+  );
+});
+
 test("rejects an upload path that is not a regular file", async () => {
   const dirPath = await fs.mkdtemp(join(tmpdir(), "mealie-mcp-test-"));
   try {
