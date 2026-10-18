@@ -262,6 +262,44 @@ test("schemaAllowsArray identifies array and composite array schemas", () => {
       { oneOf: [{ type: "integer" }, { type: "array" }] }
     ]
   }), true);
+
+  // Edge cases: empty schema object, non-array composite branch properties, empty arrays
+  assert.equal(schemaAllowsArray({}), false);
+  assert.equal(schemaAllowsArray({ anyOf: [] }), false);
+  assert.equal(schemaAllowsArray({ oneOf: [] }), false);
+  assert.equal(schemaAllowsArray({ allOf: [] }), false);
+  assert.equal(schemaAllowsArray({ anyOf: "not-an-array" as unknown as JsonSchema[] }), false);
+
+  // Deeply nested composite boundary tests
+  assert.equal(schemaAllowsArray({
+    allOf: [
+      {
+        oneOf: [
+          {
+            anyOf: [
+              { type: "string" },
+              { type: "number" }
+            ]
+          }
+        ]
+      }
+    ]
+  }), false);
+
+  assert.equal(schemaAllowsArray({
+    allOf: [
+      {
+        oneOf: [
+          {
+            anyOf: [
+              { type: "string" },
+              { type: "array" }
+            ]
+          }
+        ]
+      }
+    ]
+  }), true);
 });
 
 test("resolveSchema behaves correctly", () => {
