@@ -16,7 +16,7 @@ import {
   type MealieTool,
 } from "../src/tools.js";
 import { makeConfig } from "./helpers.js";
-import type { OpenApiDocument } from "../src/openapi-types.js";
+import type { JsonSchema, OpenApiDocument } from "../src/openapi-types.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const snapshotPath = join(here, "..", "openapi.snapshot.json");
