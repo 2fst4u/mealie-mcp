@@ -1379,6 +1379,47 @@ test("resolveAllowedDirs drops non-existent paths", async () => {
   assert.deepEqual(dirs, []);
 });
 
+test("resolveAllowedDirs drops paths that fail internal realpath due to invalid characters or null bytes", async () => {
+  const dirs = await resolveAllowedDirs(["/path/with/\0null/byte", "/path/with/invalid\u0000char"]);
+  assert.deepEqual(dirs, []);
+});
+
+test("resolveAllowedDirs drops paths when realpath throws permission or system errors", async () => {
+  mock.method(fs, "realpath", async (p: string) => {
+    if (p.includes("error")) {
+      const err = new Error("EACCES: permission denied") as Error & { code?: string };
+      err.code = "EACCES";
+      throw err;
+    }
+    return p;
+  });
+
+  const dirs = await resolveAllowedDirs(["/allowed/error/dir"]);
+  assert.deepEqual(dirs, []);
+});
+
+test("resolveAllowedDirs handles mixed lists of valid, invalid, non-existent, and failing paths", async () => {
+  const realTmp = await fs.realpath(tmpdir());
+  const expectedTmp = realTmp.endsWith(sep) ? realTmp : realTmp + sep;
+
+  const originalRealpath = fs.realpath;
+  mock.method(fs, "realpath", async (p: string) => {
+    if (p.includes("permission_denied")) {
+      throw new Error("EACCES: permission denied");
+    }
+    return originalRealpath(p);
+  });
+
+  const dirs = await resolveAllowedDirs([
+    "/path/does/not/exist/12345",
+    tmpdir(),
+    "/path/with/\0null/byte",
+    "/path/permission_denied/dir",
+  ]);
+
+  assert.deepEqual(dirs, [expectedTmp]);
+});
+
 test("resolveAllowedDirs realpaths valid entries and gives them a trailing separator", async () => {
   // The trailing separator is what stops `/srv/uploads` from being satisfied by
   // `/srv/uploads-evil`, and the realpath is what makes a symlinked allowed
