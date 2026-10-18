@@ -22,7 +22,7 @@ const MAX_TEXT = 100_000;
 // containment — the allowlist check in `readUpload` owns that. It is about not
 // forwarding a name Mealie has to cope with: control characters, quotes, and
 // characters that are illegal in a filename on the far side.
-export function sanitizeFilename(name: string): string {
+function sanitizeFilename(name: string): string {
   const safe = name.replace(/[\x00-\x1F\x7F<>:"/\\|?*]/g, "_");
   // A name that was nothing but stripped characters, or only dots, is no name.
   return !safe || /^\.+$/.test(safe) ? "upload.bin" : safe;
