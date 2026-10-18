@@ -141,8 +141,11 @@ function findFileFields(schema: JsonSchema | undefined, components: Record<strin
     return false;
   };
   const result: string[] = [];
-  for (const k of Object.keys(props)) {
-    if (isBinary(props[k])) result.push(k);
+  // ⚡ Bolt: for...in avoids Object.keys() allocating an intermediate array of keys.
+  for (const k in props) {
+    if (Object.prototype.hasOwnProperty.call(props, k) && isBinary(props[k])) {
+      result.push(k);
+    }
   }
   return result;
 }
