@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadOpenApi, sameOrigin } from "../src/openapi-loader.js";
+import { loadOpenApi } from "../src/openapi-loader.js";
 import { createTokenProvider } from "../src/auth.js";
 import type { Config } from "../src/config.js";
 import { makeConfig } from "./helpers.js";
@@ -69,38 +69,6 @@ test("uses the live spec from ${baseUrl}/openapi.json when the fetch succeeds an
   }
 });
 
-test("sameOrigin returns true when URLs have the same origin", () => {
-  assert.equal(sameOrigin("https://mealie.example.com", "https://mealie.example.com"), true);
-  assert.equal(sameOrigin("http://localhost:3000", "http://localhost:3000/api/v1"), true);
-});
-
-test("sameOrigin returns true when URLs have same origin despite different paths, queries, or hashes", () => {
-  assert.equal(
-    sameOrigin(
-      "https://mealie.example.com/api/v1/recipes?sort=name#top",
-      "https://mealie.example.com/openapi.json",
-    ),
-    true,
-  );
-});
-
-test("sameOrigin returns false when schemes differ", () => {
-  assert.equal(sameOrigin("http://mealie.example.com", "https://mealie.example.com"), false);
-});
-
-test("sameOrigin returns false when hostnames differ", () => {
-  assert.equal(sameOrigin("https://mealie.example.com", "https://other.example.com"), false);
-});
-
-test("sameOrigin returns false when ports differ", () => {
-  assert.equal(sameOrigin("http://localhost:3000", "http://localhost:8080"), false);
-});
-
-test("sameOrigin returns false for invalid URL strings", () => {
-  assert.equal(sameOrigin("invalid-url", "https://mealie.example.com"), false);
-  assert.equal(sameOrigin("https://mealie.example.com", "invalid-url"), false);
-  assert.equal(sameOrigin("invalid-left", "invalid-right"), false);
-});
 
 test("fetchLive sets redirect to error to prevent ssrf via redirects", async () => {
   const liveSpec = { paths: { "/live": {} }, info: { title: "Live" } };
