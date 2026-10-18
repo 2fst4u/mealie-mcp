@@ -77,3 +77,46 @@ test("index.ts logs a warning if no tools match the filters", () => {
   assert.equal(status, 0);
   assert.ok(stderr.includes("[mealie-mcp] Warning: no tools matched your include/exclude filters. The server will expose nothing."));
 });
+
+test("index.ts logs hidden write-only categories when MEALIE_READ_ONLY is set", () => {
+  const { stderr, status } = runIndex({
+    MEALIE_BASE_URL: "http://localhost",
+    MEALIE_READ_ONLY: "true",
+  });
+  assert.equal(status, 0);
+  assert.ok(stderr.includes("MEALIE_READ_ONLY hides"));
+  assert.ok(stderr.includes("write-only categories:"));
+});
+
+test("index.ts logs hidden categories when MEALIE_TOOLS and MEALIE_EXCLUDE_TOOLS are set", () => {
+  const { stderr, status } = runIndex({
+    MEALIE_BASE_URL: "http://localhost",
+    MEALIE_TOOLS: "recipes",
+    MEALIE_EXCLUDE_TOOLS: "households",
+  });
+  assert.equal(status, 0);
+  assert.ok(stderr.includes("MEALIE_TOOLS / MEALIE_EXCLUDE_TOOLS hides"));
+  assert.ok(stderr.includes("categories entirely:"));
+});
+
+test("index.ts logs note when MEALIE_API_TOKEN is provided alongside OAuth", () => {
+  const { stderr, status } = runIndex({
+    MEALIE_BASE_URL: "http://localhost",
+    MEALIE_OAUTH_TOKEN_URL: "http://localhost/token",
+    MEALIE_OAUTH_CLIENT_ID: "client",
+    MEALIE_OAUTH_CLIENT_SECRET: "secret",
+    MEALIE_API_TOKEN: "static-token",
+  });
+  assert.equal(status, 0);
+  assert.ok(stderr.includes("Note: MEALIE_API_TOKEN is ignored because OAuth is configured."));
+});
+
+test("index.ts logs categories with MEALIE_DEBUG enabled", () => {
+  const { stderr, status } = runIndex({
+    MEALIE_BASE_URL: "http://localhost",
+    MEALIE_READ_ONLY: "true",
+    MEALIE_DEBUG: "true",
+  });
+  assert.equal(status, 0);
+  assert.ok(stderr.includes("MEALIE_READ_ONLY hides"));
+});
