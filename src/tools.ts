@@ -141,11 +141,12 @@ function findFileFields(schema: JsonSchema | undefined, components: Record<strin
     return false;
   };
   const result: string[] = [];
-  // ⚡ Bolt: for...in avoids Object.keys() allocating an intermediate array of keys.
-  for (const k in props) {
-    if (Object.prototype.hasOwnProperty.call(props, k) && isBinary(props[k])) {
-      result.push(k);
-    }
+  // Kept as `Object.keys` + `for...of` on purpose: this runs once per multipart
+  // operation at startup over a handful of properties, so the ~9% microbenchmark
+  // gain of `for...in` + `hasOwnProperty` is not measurable in practice and it
+  // trades a plain loop for a noisier, easier-to-misread one (declined in #250).
+  for (const k of Object.keys(props)) {
+    if (isBinary(props[k])) result.push(k);
   }
   return result;
 }
