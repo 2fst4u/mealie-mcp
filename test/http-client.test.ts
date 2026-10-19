@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, mimeTypeFor, readUpload, resolveAllowedDirs, executeWithRetry, scalar, type SendResult, type BodyResult } from "../src/http-client.js";
+import { executeTool, mimeTypeFor, readUpload, resolveAllowedDirs, executeWithRetry, scalar, type SendResult } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
