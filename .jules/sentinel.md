@@ -96,3 +96,7 @@ if (url.origin !== new URL(base).origin) {
 **Vulnerability:** Node.js `new URL()` converts backslashes (`\`) to forward slashes (`/`), allowing `\\evil.com` to be parsed as the protocol-relative URL `//evil.com`.
 **Learning:** Stripping only leading forward slashes (`^\/+`) from an untrusted path before resolving it against a base URL fails to prevent an attacker from supplying backslashes to construct a protocol-relative path, bypassing SSRF protection.
 **Prevention:** Strip both leading forward slashes and backslashes (e.g., using `replace(/^[\\\/]+/, "")`) from untrusted paths before appending them to a base URL.
+## 2025-02-23 - Outdated SDK Dependency (GHSA-6qxp-vccf-f47h)
+**Vulnerability:** The `@modelcontextprotocol/sdk` dependency was outdated (v1.29.0) and vulnerable to GHSA-6qxp-vccf-f47h, where an OAuth client could send credentials to an authorization server chosen by the MCP server.
+**Learning:** Even when building an MCP server that acts as a proxy without direct OAuth client flows, vulnerabilities in the core SDK dependency tree can flag the project in security audits and present supply chain risks.
+**Prevention:** Regularly audit and update core SDK dependencies (`npm audit`) to ensure known CVEs are patched, mitigating inherited vulnerabilities before they can be exploited.
