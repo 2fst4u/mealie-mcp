@@ -69,7 +69,7 @@ const MIME_TYPES = new Map<string, string>([
   [".zip", "application/zip"],
 ]);
 
-export function mimeTypeFor(filePath: string): string {
+function mimeTypeFor(filePath: string): string {
   return MIME_TYPES.get(extname(filePath).toLowerCase()) ?? "application/octet-stream";
 }
 
