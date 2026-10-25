@@ -2,19 +2,25 @@ import type { JsonSchema } from "./openapi-types.js";
 
 export const COMPONENT_REF_PREFIX = "#/components/schemas/";
 
+const MAX_CLONE_DEPTH = 100;
+
 /**
  * Deep clone a JSON-compatible value.
  *
  * ⚡ Bolt: Custom recursive cloning avoids the heavy serialization overhead
  * of JSON.parse(JSON.stringify(...)), performing ~5x faster in tight loops.
  */
-export function clone<T>(value: T): T {
+export function clone<T>(value: T, depth = 0): T {
+  if (depth > MAX_CLONE_DEPTH) {
+    throw new RangeError("Maximum clone depth exceeded");
+  }
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) {
     const len = value.length;
     const arr = new Array(len);
+    const nextDepth = depth + 1;
     for (let i = 0; i < len; i++) {
-      arr[i] = clone(value[i]);
+      arr[i] = clone(value[i], nextDepth);
     }
     // ⚡ Bolt: Fast pre-allocated array loop replaces Array.prototype.map() to
     // avoid allocating a callback function and an iterator for every array
@@ -23,10 +29,11 @@ export function clone<T>(value: T): T {
   }
   const res = {} as T;
   const keys = Object.keys(value);
+  const nextDepth = depth + 1;
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i];
     if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
-    res[k as keyof T] = clone(value[k as keyof T]);
+    res[k as keyof T] = clone(value[k as keyof T], nextDepth);
   }
   return res;
 }

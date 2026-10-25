@@ -272,3 +272,17 @@ test("clone leaves Object.prototype untouched for nested hostile keys", () => {
 
   assert.equal(({} as Record<string, unknown>).nested, undefined);
 });
+
+test("clone throws RangeError when recursion depth exceeds limit", () => {
+  let deepObject: any = { level: 0 };
+  let current = deepObject;
+  for (let i = 1; i <= 101; i++) {
+    current.child = { level: i };
+    current = current.child;
+  }
+
+  assert.throws(() => clone(deepObject), {
+    name: "RangeError",
+    message: "Maximum clone depth exceeded",
+  });
+});
