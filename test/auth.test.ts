@@ -18,7 +18,7 @@ const oauthConfig = (overrides: Partial<Config> = {}): Config =>
   });
 
 /** Install a fake global fetch that returns the given token responses in order. */
-function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
+function stubFetch(responses: Array<{ status?: number; headers?: Record<string, string>; body: unknown }>) {
   const calls: Array<{ url: string; body: string; redirect?: string }> = [];
   let i = 0;
   const original = globalThis.fetch;
@@ -30,12 +30,17 @@ function stubFetch(responses: Array<{ status?: number; body: unknown }>) {
     if (r.status === -1) {
       throw new Error("Network error");
     }
+    const headersMap = new Map<string, string>(Object.entries(r.headers ?? {}));
+    const textBody = typeof r.body === "string" ? r.body : JSON.stringify(r.body);
     return {
       ok: (r.status ?? 200) < 400,
       status: r.status ?? 200,
       statusText: "",
-      text: async () => (typeof r.body === "string" ? r.body : JSON.stringify(r.body)),
-    } as Response;
+      headers: {
+        get: (name: string) => headersMap.get(name.toLowerCase()) ?? null,
+      },
+      text: async () => textBody,
+    } as unknown as Response;
   }) as typeof fetch;
   return { calls, restore: () => (globalThis.fetch = original) };
 }
@@ -53,6 +58,43 @@ test("OAuth provider fetches a bearer token and sends the client-credentials gra
     assert.match(fetchStub.calls[0].body, /scope=mealie/);
     assert.match(fetchStub.calls[0].body, /audience=aud/);
     assert.equal(fetchStub.calls[0].redirect, "error");
+  } finally {
+    fetchStub.restore();
+  }
+});
+
+test("OAuth provider rejects responses exceeding Content-Length limit", async () => {
+  const fetchStub = stubFetch([
+    {
+      status: 200,
+      headers: { "content-length": "2097152" },
+      body: "{}",
+    },
+  ]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(
+      () => provider.authHeader(),
+      /OAuth token request to https:\/\/idp\.example\.com\/token failed: Response size \(2097152 bytes\) exceeds maximum allowed size of 1048576 bytes/,
+    );
+  } finally {
+    fetchStub.restore();
+  }
+});
+
+test("OAuth provider rejects response bodies exceeding maximum byte limit", async () => {
+  const fetchStub = stubFetch([
+    {
+      status: 200,
+      body: "a".repeat(1024 * 1024 + 1),
+    },
+  ]);
+  try {
+    const provider = createTokenProvider(oauthConfig());
+    await assert.rejects(
+      () => provider.authHeader(),
+      /OAuth token request to https:\/\/idp\.example\.com\/token failed: Response size exceeds maximum allowed size of 1048576 bytes/,
+    );
   } finally {
     fetchStub.restore();
   }
