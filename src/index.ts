@@ -72,7 +72,10 @@ function logStartupSummary(
     log("Warning: no tools matched your include/exclude filters. The server will expose nothing.");
   }
 
-  const categories = new Set<string>(tools.map((t) => t.category));
+  const categories = new Set<string>();
+  for (const t of tools) {
+    categories.add(t.category);
+  }
 
   log(`${SERVER_NAME} v${version}`);
   log(`Mealie: ${config.baseUrl} | spec: ${source} (${specVersion} version)`);
