@@ -136,7 +136,7 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
   return url.toString();
 }
 
-export function scalar(value: unknown): string {
+function scalar(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);

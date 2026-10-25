@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
-import { executeTool, mimeTypeFor, readUpload, resolveAllowedDirs, executeWithRetry, scalar, type SendResult, type BodyResult } from "../src/http-client.js";
+import { executeTool, mimeTypeFor, readUpload, resolveAllowedDirs, executeWithRetry, type SendResult, type BodyResult } from "../src/http-client.js";
 import type { Config } from "../src/config.js";
 import { safeUrl } from "../src/utils/url.js";
 import type { MealieTool } from "../src/tools.js";
@@ -1476,24 +1476,6 @@ test("mimeTypeFor falls back to application/octet-stream for unknown or missing 
   assert.equal(mimeTypeFor("file_without_ext"), "application/octet-stream");
 });
 
-test("scalar correctly formats string inputs", () => {
-  assert.equal(scalar("hello"), "hello");
-  assert.equal(scalar(""), "");
-});
-
-test("scalar correctly formats primitive non-string inputs", () => {
-  assert.equal(scalar(123), "123");
-  assert.equal(scalar(0), "0");
-  assert.equal(scalar(true), "true");
-  assert.equal(scalar(false), "false");
-  assert.equal(scalar(undefined), "undefined");
-});
-
-test("scalar correctly formats object and array inputs as JSON string or null", () => {
-  assert.equal(scalar({ a: 1 }), '{"a":1}');
-  assert.equal(scalar([1, 2]), "[1,2]");
-  assert.equal(scalar(null), "null");
-});
 
 test("executeWithRetry: succeeds on first attempt without retrying", async () => {
   let callCount = 0;
