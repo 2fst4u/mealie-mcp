@@ -376,28 +376,7 @@ async function readTextBody(res: Response): Promise<BodyResult> {
   return { blocks: [text(truncate(raw))], raw };
 }
 
-async function readBody(res: Response): Promise<BodyResult> {
-  const contentType = res.headers.get("content-type") ?? "";
-
-  if (res.status === 204 || res.headers.get("content-length") === "0") {
-    // Only call an empty body a "success"; on an error status the caller
-    // prepends the HTTP status, so a neutral note reads correctly there.
-    const message = res.ok ? `Success (HTTP ${res.status}, no content).` : "(no response body)";
-    return { blocks: [text(message)], raw: "" };
-  }
-
-  if (contentType.startsWith("application/json")) {
-    return readJsonBody(res);
-  }
-
-  if (contentType.startsWith("image/")) {
-    return readImageBody(res, contentType);
-  }
-
-  if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
-    return readTextBody(res);
-  }
-
+async function readBinaryBody(res: Response, contentType: string): Promise<BodyResult> {
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
   let length: number;
   let truncated = false;
@@ -433,6 +412,31 @@ async function readBody(res: Response): Promise<BodyResult> {
     blocks: [text(`Received ${lengthDisplay} bytes of binary data (${contentType || "unknown type"}).`)],
     raw: `[binary ${lengthDisplay} bytes]`,
   };
+}
+
+async function readBody(res: Response): Promise<BodyResult> {
+  const contentType = res.headers.get("content-type") ?? "";
+
+  if (res.status === 204 || res.headers.get("content-length") === "0") {
+    // Only call an empty body a "success"; on an error status the caller
+    // prepends the HTTP status, so a neutral note reads correctly there.
+    const message = res.ok ? `Success (HTTP ${res.status}, no content).` : "(no response body)";
+    return { blocks: [text(message)], raw: "" };
+  }
+
+  if (contentType.startsWith("application/json")) {
+    return readJsonBody(res);
+  }
+
+  if (contentType.startsWith("image/")) {
+    return readImageBody(res, contentType);
+  }
+
+  if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
+    return readTextBody(res);
+  }
+
+  return readBinaryBody(res, contentType);
 }
 
 async function buildPayload(
