@@ -378,8 +378,9 @@ async function readTextBody(res: Response): Promise<BodyResult> {
 
 async function readBody(res: Response): Promise<BodyResult> {
   const contentType = res.headers.get("content-type") ?? "";
+  const contentLength = res.headers.get("content-length");
 
-  if (res.status === 204 || res.headers.get("content-length") === "0") {
+  if (res.status === 204 || contentLength === "0") {
     // Only call an empty body a "success"; on an error status the caller
     // prepends the HTTP status, so a neutral note reads correctly there.
     const message = res.ok ? `Success (HTTP ${res.status}, no content).` : "(no response body)";
@@ -401,7 +402,6 @@ async function readBody(res: Response): Promise<BodyResult> {
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
   let length: number;
   let truncated = false;
-  const contentLength = res.headers.get("content-length");
   const parsedLength = contentLength ? Number.parseInt(contentLength, 10) : NaN;
 
   if (Number.isFinite(parsedLength) && parsedLength >= 0) {
