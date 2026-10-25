@@ -231,7 +231,7 @@ export function buildKeywords(
  * A one-line summary that always names the resource and the action, even when
  * the spec only offered "Patch One".
  */
-export function buildHeadline(op: OpenApiOperation, path: string, method: HttpMethod): string {
+function buildHeadline(op: OpenApiOperation, path: string, method: HttpMethod): string {
   const resource = resourceNoun(path);
   const verb = resource.actionVerb ?? actionFor(method, path, resource).verb;
   const noun = listsMany(method, path, resource) ? resource.plural : resource.singular;
