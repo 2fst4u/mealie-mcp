@@ -48,7 +48,7 @@ export interface MealieTool {
  * hoisting them into module-scoped constants saves nothing measurable and
  * separates each pattern from the one line that uses it (declined in #229).
  */
-export function slug(value: string): string {
+function slug(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
