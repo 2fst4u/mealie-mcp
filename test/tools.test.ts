@@ -7,7 +7,6 @@ import {
   generateTools,
   filterTools,
   hiddenCategories,
-  DEFAULT_EXCLUDE,
   HARD_EXCLUDE,
   resolveSchema,
   schemaAllowsArray,
@@ -202,8 +201,8 @@ test("hard baseline always drops the default-exclude list and admin endpoints", 
   assert.ok(trimmed.length < tools.length, "expected fewer tools after trimming");
   // Admin categories are never exposed.
   assert.ok(trimmed.every((t) => !t.category.startsWith("admin")));
-  // Each curated default-exclude entry is gone.
-  for (const name of DEFAULT_EXCLUDE) {
+  // Each curated hard-exclude entry is gone.
+  for (const name of HARD_EXCLUDE) {
     assert.ok(
       !trimmed.some((t) => t.name === name || t.category === name),
       `expected hard-excluded "${name}" to be trimmed`,
