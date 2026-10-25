@@ -260,8 +260,11 @@ async function buildMultipart(
 export type BodyResult = { blocks: ContentBlock[]; raw: string };
 export type SendResult = { res: Response; body: BodyResult };
 
-async function readImageBody(res: Response, contentType: string): Promise<BodyResult> {
-  const contentLength = res.headers.get("content-length");
+async function readImageBody(
+  res: Response,
+  contentType: string,
+  contentLength: string | null,
+): Promise<BodyResult> {
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > MAX_IMAGE_SIZE) {
@@ -313,8 +316,10 @@ async function readImageBody(res: Response, contentType: string): Promise<BodyRe
   };
 }
 
-async function readTextRaw(res: Response): Promise<{ raw: string; exceeded: boolean }> {
-  const contentLength = res.headers.get("content-length");
+async function readTextRaw(
+  res: Response,
+  contentLength: string | null,
+): Promise<{ raw: string; exceeded: boolean }> {
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (!isNaN(size) && size > MAX_RESPONSE_SIZE) {
@@ -349,8 +354,8 @@ async function readTextRaw(res: Response): Promise<{ raw: string; exceeded: bool
   return { raw, exceeded: false };
 }
 
-async function readJsonBody(res: Response): Promise<BodyResult> {
-  const { raw, exceeded } = await readTextRaw(res);
+async function readJsonBody(res: Response, contentLength: string | null): Promise<BodyResult> {
+  const { raw, exceeded } = await readTextRaw(res, contentLength);
   if (exceeded) {
     return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
   }
@@ -368,8 +373,8 @@ async function readJsonBody(res: Response): Promise<BodyResult> {
   }
 }
 
-async function readTextBody(res: Response): Promise<BodyResult> {
-  const { raw, exceeded } = await readTextRaw(res);
+async function readTextBody(res: Response, contentLength: string | null): Promise<BodyResult> {
+  const { raw, exceeded } = await readTextRaw(res, contentLength);
   if (exceeded) {
     return { blocks: [text("Response size exceeds maximum allowed size of 10MB.")], raw };
   }
@@ -378,8 +383,9 @@ async function readTextBody(res: Response): Promise<BodyResult> {
 
 async function readBody(res: Response): Promise<BodyResult> {
   const contentType = res.headers.get("content-type") ?? "";
+  const contentLength = res.headers.get("content-length");
 
-  if (res.status === 204 || res.headers.get("content-length") === "0") {
+  if (res.status === 204 || contentLength === "0") {
     // Only call an empty body a "success"; on an error status the caller
     // prepends the HTTP status, so a neutral note reads correctly there.
     const message = res.ok ? `Success (HTTP ${res.status}, no content).` : "(no response body)";
@@ -387,21 +393,20 @@ async function readBody(res: Response): Promise<BodyResult> {
   }
 
   if (contentType.startsWith("application/json")) {
-    return readJsonBody(res);
+    return readJsonBody(res, contentLength);
   }
 
   if (contentType.startsWith("image/")) {
-    return readImageBody(res, contentType);
+    return readImageBody(res, contentType, contentLength);
   }
 
   if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
-    return readTextBody(res);
+    return readTextBody(res, contentLength);
   }
 
   // Other binary payloads (zip, pdf, octet-stream): summarize instead of dumping base64.
   let length: number;
   let truncated = false;
-  const contentLength = res.headers.get("content-length");
   const parsedLength = contentLength ? Number.parseInt(contentLength, 10) : NaN;
 
   if (Number.isFinite(parsedLength) && parsedLength >= 0) {
