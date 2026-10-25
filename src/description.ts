@@ -86,7 +86,7 @@ const METHOD_ACTIONS: Record<string, Action> = {
 };
 
 /** Crude English singularisation — good enough for REST path segments. */
-export function singularize(word: string): string {
+function singularize(word: string): string {
   if (/ies$/.test(word) && word.length > 4) return `${word.slice(0, -3)}y`;
   if (/(s|x|z|ch|sh)es$/.test(word)) return word.slice(0, -2);
   if (/ss$/.test(word) || !/s$/.test(word) || word.length <= 3) return word;

@@ -9,7 +9,6 @@ import {
   buildKeywords,
   pathSegments,
   resourceNoun,
-  singularize,
 } from "../src/description.js";
 import { generateTools } from "../src/tools.js";
 import type { OpenApiDocument } from "../src/openapi-types.js";
@@ -28,15 +27,6 @@ test("pathSegments extracts, normalizes, and expands REST path segments", () => 
     "items test v1",
   ]);
   assert.deepEqual(pathSegments("//api///mealplanner//"), ["meal planner"]);
-});
-
-test("singularize handles the plural shapes REST paths use", () => {
-  assert.equal(singularize("recipes"), "recipe");
-  assert.equal(singularize("categories"), "category");
-  assert.equal(singularize("boxes"), "box");
-  assert.equal(singularize("foods"), "food");
-  assert.equal(singularize("timeline"), "timeline");
-  assert.equal(singularize("css"), "css");
 });
 
 test("resourceNoun names the resource a path acts on", () => {
