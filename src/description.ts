@@ -132,7 +132,7 @@ export interface Resource {
  * a trailing weak segment borrows the one before it, so
  * `/shopping/lists/{id}/items` yields "list item" rather than "item".
  */
-export function resourceNoun(path: string): Resource {
+function resourceNoun(path: string): Resource {
   const segments = pathSegments(path);
   let index = segments.length - 1;
   let actionVerb: string | undefined;

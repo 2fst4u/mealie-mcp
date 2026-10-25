@@ -8,7 +8,6 @@ import {
   buildHeadline,
   buildKeywords,
   pathSegments,
-  resourceNoun,
   singularize,
 } from "../src/description.js";
 import { generateTools } from "../src/tools.js";
@@ -39,21 +38,13 @@ test("singularize handles the plural shapes REST paths use", () => {
   assert.equal(singularize("css"), "css");
 });
 
-test("resourceNoun names the resource a path acts on", () => {
-  assert.deepEqual(resourceNoun("/api/recipes/{slug}"), {
-    plural: "recipes",
-    singular: "recipe",
-    isPlural: true,
-    actionVerb: undefined,
-  });
-  // Compound words Mealie writes as one token are split for readers and search.
-  assert.equal(resourceNoun("/api/households/mealplans").plural, "meal plans");
-  // A weak trailing segment borrows the one before it.
-  assert.equal(resourceNoun("/api/households/shopping/items/{item_id}").singular, "shopping item");
-  // Action and lookup-key segments are skipped, and name the verb instead.
-  assert.equal(resourceNoun("/api/recipes/create/zip").singular, "recipe");
-  assert.equal(resourceNoun("/api/recipes/{slug}/duplicate").actionVerb, "Duplicate");
-  assert.equal(resourceNoun("/api/organizers/categories/slug/{category_slug}").singular, "category");
+test("buildHeadline handles compound words, weak segments, and action verbs in paths", () => {
+  assert.equal(buildHeadline({}, "/api/recipes/{slug}", "get"), "Get recipe.");
+  assert.equal(buildHeadline({}, "/api/households/mealplans", "get"), "List meal plans.");
+  assert.equal(buildHeadline({}, "/api/households/shopping/items/{item_id}", "get"), "Get shopping item.");
+  assert.equal(buildHeadline({}, "/api/recipes/create/zip", "get"), "Create recipes.");
+  assert.equal(buildHeadline({}, "/api/recipes/{slug}/duplicate", "post"), "Duplicate recipe.");
+  assert.equal(buildHeadline({}, "/api/organizers/categories/slug/{category_slug}", "get"), "Get category.");
 });
 
 test("headline names the action and resource even when the summary does not", () => {
