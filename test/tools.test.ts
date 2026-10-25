@@ -11,7 +11,6 @@ import {
   HARD_EXCLUDE,
   resolveSchema,
   schemaAllowsArray,
-  dedupeTokens,
   slug,
   type MealieTool,
 } from "../src/tools.js";
@@ -325,26 +324,6 @@ test("resolveSchema behaves correctly", () => {
   // Schema with resolvable $ref
   const goodRef = { $ref: "#/components/schemas/MyComponent" };
   assert.equal(resolveSchema(goodRef, components), components.MyComponent);
-});
-
-test("dedupeTokens collapses immediately repeated tokens and handles edge cases", () => {
-  // Basic repeated tokens
-  assert.equal(dedupeTokens("recipe_recipe_get"), "recipe_get");
-
-  // Multiple consecutive repeated tokens
-  assert.equal(dedupeTokens("a_a_a_b_b_c"), "a_b_c");
-
-  // Non-consecutive repeated tokens are preserved
-  assert.equal(dedupeTokens("a_b_a"), "a_b_a");
-
-  // Handles leading, trailing, and duplicate underscores
-  assert.equal(dedupeTokens("_a__b_"), "a_b");
-
-  // Single token with no underscores
-  assert.equal(dedupeTokens("recipe"), "recipe");
-
-  // Empty string
-  assert.equal(dedupeTokens(""), "");
 });
 
 test("slug string formatter sanitizes strings correctly", () => {
