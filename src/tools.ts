@@ -433,7 +433,7 @@ const ADMIN_EXCLUDE: string[] = ["admin"];
  * baseline: users can narrow further via MEALIE_TOOLS / MEALIE_EXCLUDE_TOOLS,
  * but cannot re-enable anything listed here.
  */
-export const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
+const HARD_EXCLUDE: string[] = [...DEFAULT_EXCLUDE, ...ADMIN_EXCLUDE];
 
 // Kept as `new Set(tools.map(...))` on purpose: the tool list is built once at
 // startup, so the intermediate array costs nothing measurable and a hand-rolled

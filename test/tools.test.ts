@@ -8,7 +8,6 @@ import {
   filterTools,
   hiddenCategories,
   DEFAULT_EXCLUDE,
-  HARD_EXCLUDE,
   resolveSchema,
   schemaAllowsArray,
   dedupeTokens,
@@ -226,7 +225,7 @@ test("trimming constants reference real endpoints", async () => {
   const doc = await loadSnapshot();
   const tools = generateTools(doc);
   // Guard against typos / upstream renames silently no-op'ing an exclusion.
-  for (const name of HARD_EXCLUDE) {
+  for (const name of [...DEFAULT_EXCLUDE, "admin"]) {
     assert.ok(
       tools.some((t) => t.name === name || t.category === name || t.category.startsWith(`${name}_`)),
       `trimming entry "${name}" matched no tool or category`,
