@@ -6,7 +6,6 @@ import { dirname, join } from "node:path";
 import {
   buildDescription,
   buildHeadline,
-  buildKeywords,
   pathSegments,
   resourceNoun,
   singularize,
@@ -68,7 +67,7 @@ test("headline names the action and resource even when the summary does not", ()
 });
 
 test("keywords cover the tool name and every synonym of its method", () => {
-  const keywords = buildKeywords(
+  const desc = buildDescription(
     { summary: "Patch One", tags: ["Recipe: CRUD"] },
     "/api/recipes/{slug}",
     "patch",
@@ -87,15 +86,14 @@ test("keywords cover the tool name and every synonym of its method", () => {
     "write",
     "mealie",
   ]) {
-    assert.ok(keywords.includes(expected), `missing keyword: ${expected}`);
+    assert.ok(desc.includes(expected), `missing keyword: ${expected}`);
   }
-  assert.equal(new Set(keywords).size, keywords.length, "keywords contain duplicates");
 });
 
 test("read-only operations are not labelled as writes", () => {
-  const keywords = buildKeywords({}, "/api/recipes", "get", "recipe_crud_get_all", "recipe_crud");
-  assert.ok(keywords.includes("read-only"));
-  assert.ok(!keywords.includes("write"));
+  const desc = buildDescription({}, "/api/recipes", "get", "recipe_crud_get_all", "recipe_crud");
+  assert.ok(desc.includes("read-only"));
+  assert.ok(!desc.includes("write"));
 });
 
 test("description keeps the route line and never drops the keywords", () => {

@@ -194,7 +194,7 @@ function addKeyword(seen: Set<string>, out: string[], value: string): void {
  * name, its category, the resource it acts on and every verb that means the same
  * thing as its HTTP method.
  */
-export function buildKeywords(
+function buildKeywords(
   op: OpenApiOperation,
   path: string,
   method: HttpMethod,
