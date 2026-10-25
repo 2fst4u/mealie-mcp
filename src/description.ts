@@ -107,7 +107,7 @@ function expandCompounds(phrase: string): string {
  * runs once per operation at startup, so a hand-rolled loop saves nothing
  * measurable and reads worse (declined in #222).
  */
-export function pathSegments(path: string): string[] {
+function pathSegments(path: string): string[] {
   return path
     .split("/")
     .filter((s) => s.length > 0 && s !== "api" && !s.startsWith("{"))
