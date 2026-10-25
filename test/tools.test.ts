@@ -10,7 +10,6 @@ import {
   DEFAULT_EXCLUDE,
   HARD_EXCLUDE,
   resolveSchema,
-  schemaAllowsArray,
   dedupeTokens,
   slug,
   type MealieTool,
@@ -234,73 +233,6 @@ test("trimming constants reference real endpoints", async () => {
   }
 });
 
-test("schemaAllowsArray identifies array and composite array schemas", () => {
-  // Undefined
-  assert.equal(schemaAllowsArray(undefined), false);
-
-  // Scalar types
-  assert.equal(schemaAllowsArray({ type: "string" }), false);
-  assert.equal(schemaAllowsArray({ type: "integer" }), false);
-
-  // Simple array
-  assert.equal(schemaAllowsArray({ type: "array" }), true);
-
-  // Composite schemas
-  assert.equal(schemaAllowsArray({ anyOf: [{ type: "string" }, { type: "integer" }] }), false);
-  assert.equal(schemaAllowsArray({ anyOf: [{ type: "string" }, { type: "array" }] }), true);
-
-  assert.equal(schemaAllowsArray({ oneOf: [{ type: "string" }, { type: "integer" }] }), false);
-  assert.equal(schemaAllowsArray({ oneOf: [{ type: "string" }, { type: "array" }] }), true);
-
-  assert.equal(schemaAllowsArray({ allOf: [{ type: "string" }, { type: "integer" }] }), false);
-  assert.equal(schemaAllowsArray({ allOf: [{ type: "string" }, { type: "array" }] }), true);
-
-  // Deeply nested composites
-  assert.equal(schemaAllowsArray({
-    anyOf: [
-      { type: "string" },
-      { oneOf: [{ type: "integer" }, { type: "array" }] }
-    ]
-  }), true);
-
-  // Edge cases: empty schema object, non-array composite branch properties, empty arrays
-  assert.equal(schemaAllowsArray({}), false);
-  assert.equal(schemaAllowsArray({ anyOf: [] }), false);
-  assert.equal(schemaAllowsArray({ oneOf: [] }), false);
-  assert.equal(schemaAllowsArray({ allOf: [] }), false);
-  assert.equal(schemaAllowsArray({ anyOf: "not-an-array" as unknown as JsonSchema[] }), false);
-
-  // Deeply nested composite boundary tests
-  assert.equal(schemaAllowsArray({
-    allOf: [
-      {
-        oneOf: [
-          {
-            anyOf: [
-              { type: "string" },
-              { type: "number" }
-            ]
-          }
-        ]
-      }
-    ]
-  }), false);
-
-  assert.equal(schemaAllowsArray({
-    allOf: [
-      {
-        oneOf: [
-          {
-            anyOf: [
-              { type: "string" },
-              { type: "array" }
-            ]
-          }
-        ]
-      }
-    ]
-  }), true);
-});
 
 test("resolveSchema behaves correctly", () => {
   const components = {

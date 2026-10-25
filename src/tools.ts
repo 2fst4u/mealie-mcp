@@ -101,7 +101,7 @@ function clampName(name: string, max: number): string {
 }
 
 /** Does a parameter schema permit an array value (so we repeat the query key)? */
-export function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
+function schemaAllowsArray(schema: JsonSchema | undefined): boolean {
   if (!schema) return false;
   if (schema.type === "array") return true;
   for (const key of ["anyOf", "oneOf", "allOf"] as const) {
