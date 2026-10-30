@@ -72,10 +72,12 @@ function logStartupSummary(
     log("Warning: no tools matched your include/exclude filters. The server will expose nothing.");
   }
 
-  const categories = new Set<string>();
-  for (const tool of tools) {
-    categories.add(tool.category);
-  }
+  // Kept as `new Set(tools.map(...))` on purpose: this runs exactly once at
+  // startup over a few hundred tools, so the intermediate array costs nothing
+  // measurable and a hand-rolled `for...of` loop only adds lines. Repeatedly
+  // proposed as a "perf" change (#265, #267, #270, #271) and declined; see the
+  // same note in src/tools.ts (#237).
+  const categories = new Set<string>(tools.map((t) => t.category));
 
   log(`${SERVER_NAME} v${version}`);
   log(`Mealie: ${config.baseUrl} | spec: ${source} (${specVersion} version)`);
