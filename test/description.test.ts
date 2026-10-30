@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   buildDescription,
-  buildHeadline,
   buildKeywords,
   pathSegments,
   resourceNoun,
@@ -57,14 +56,17 @@ test("resourceNoun names the resource a path acts on", () => {
 });
 
 test("headline names the action and resource even when the summary does not", () => {
-  const patch = buildHeadline({ summary: "Patch One", tags: ["Recipe: CRUD"] }, "/api/recipes/{slug}", "patch");
+  const getHeadline = (op: Parameters<typeof buildDescription>[0], path: string, method: Parameters<typeof buildDescription>[2]) =>
+    buildDescription(op, path, method, "test_tool", "test_cat").split("\n")[0];
+
+  const patch = getHeadline({ summary: "Patch One", tags: ["Recipe: CRUD"] }, "/api/recipes/{slug}", "patch");
   assert.equal(patch, "Patch One — Recipe: CRUD. Partially update recipe.");
 
-  const list = buildHeadline({ summary: "Get All", tags: ["Households: Mealplans"] }, "/api/households/mealplans", "get");
+  const list = getHeadline({ summary: "Get All", tags: ["Households: Mealplans"] }, "/api/households/mealplans", "get");
   assert.equal(list, "Get All — Households: Mealplans. List meal plans.");
 
   // A GET on a singleton path reads one record, so it is not phrased as a list.
-  assert.equal(buildHeadline({}, "/api/app/about", "get"), "Get about.");
+  assert.equal(getHeadline({}, "/api/app/about", "get"), "Get about.");
 });
 
 test("keywords cover the tool name and every synonym of its method", () => {
