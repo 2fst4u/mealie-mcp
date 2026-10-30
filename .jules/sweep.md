@@ -20,3 +20,6 @@ Code health convention: Prefer `for...of` loops for simple array iteration to im
 ## 2023-11-09 - Unused TypeScript mock parameters
 **Learning:** In TypeScript tests, especially when mocking library functions like `fetch`, parameters that are required by the mocked type signature but unused in the mock implementation can trigger `noUnusedParameters` compiler errors if strictly configured.
 **Action:** Always verify test files are clear of unused parameter errors by running `npx tsc -p tsconfig.test.json --noUnusedLocals --noUnusedParameters`. When cleaning up unused parameters in mocks, safely rename them by prefixing with an underscore (`_`) or completely remove trailing parameters if they aren't needed.
+## 2024-10-19 - TypeScript strict unused checks
+**Learning:** To strictly find unused imports/locals without altering tsconfig.json, use `npx tsc -p tsconfig.test.json --noUnusedLocals --noUnusedParameters`.
+**Action:** Use this command line flag pattern to manually identify cleanup targets for Sweep tasks in TypeScript repositories without causing unrequested structural changes to tsconfig.json.
