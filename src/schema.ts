@@ -7,6 +7,15 @@ const MAX_CLONE_DEPTH = 100;
 /**
  * Deep clone a JSON-compatible value.
  *
+ * NOTE (#272): on main `clone` is deliberately unbounded. Its only input is
+ * the OpenAPI document of the operator's own Mealie instance (via JSON.parse,
+ * so it is acyclic and bounded by the 10MB response cap), not attacker-supplied
+ * data. `walkRefs`/`collectRefs` recurse over the same structures without a
+ * depth bound, so limiting only `clone` would not remove any stack-overflow
+ * path, and a fixed limit of 100 risks rejecting legitimately deep schemas.
+ * It also widens the signature of an exported function (the extra `depth`
+ * parameter breaks `arr.map(clone)`-style use).
+ *
  * ⚡ Bolt: Custom recursive cloning avoids the heavy serialization overhead
  * of JSON.parse(JSON.stringify(...)), performing ~5x faster in tight loops.
  */
