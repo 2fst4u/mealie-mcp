@@ -5,10 +5,16 @@ export const COMPONENT_REF_PREFIX = "#/components/schemas/";
 /**
  * Deep clone a JSON-compatible value.
  *
+ * Intentionally exported: test/schema.test.ts exercises `clone` directly,
+ * including the guard that drops `__proto__` / `constructor` / `prototype`
+ * keys (a real prototype-pollution finding, see .jules/sentinel.md). Removing
+ * the export means deleting those security regression tests, so "unused
+ * export" sweeps (#278) should leave it alone.
+ *
  * ⚡ Bolt: Custom recursive cloning avoids the heavy serialization overhead
  * of JSON.parse(JSON.stringify(...)), performing ~5x faster in tight loops.
  */
-function clone<T>(value: T): T {
+export function clone<T>(value: T): T {
   if (value === null || typeof value !== "object") return value;
   if (Array.isArray(value)) {
     const len = value.length;
