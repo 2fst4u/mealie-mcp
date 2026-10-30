@@ -408,7 +408,7 @@ function matches(tool: MealieTool, conditions: FilterConditions): boolean {
  * (The `Users: Authentication` category is intentionally kept — the server can
  * authenticate via OAuth, so those routes are relevant.)
  */
-export const DEFAULT_EXCLUDE: string[] = [
+const DEFAULT_EXCLUDE: string[] = [
   "users_passwords", // forgot_password / reset_password (email-link flow)
   "register_new_user", // public signup
   "get_validation_text", // /api/media/docker/validate.txt healthcheck
