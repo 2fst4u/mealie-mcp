@@ -394,7 +394,10 @@ async function readBody(res: Response): Promise<BodyResult> {
     return readImageBody(res, contentType);
   }
 
-  if (contentType.startsWith("text/") || contentType.includes("xml") || contentType.includes("yaml")) {
+  const semiIndex = contentType.indexOf(";");
+  const mimeType = semiIndex === -1 ? contentType.trim() : contentType.slice(0, semiIndex).trim();
+
+  if (mimeType.startsWith("text/") || mimeType.endsWith("xml") || mimeType.endsWith("yaml")) {
     return readTextBody(res);
   }
 
