@@ -21,6 +21,44 @@ const EXPIRY_MARGIN_MS = 60_000;
 // Fallback lifetime when the token response omits `expires_in`.
 const DEFAULT_LIFETIME_S = 3600;
 
+const MAX_OAUTH_RESPONSE_SIZE = 1 * 1024 * 1024;
+
+async function readBoundedText(res: Response, maxBytes = MAX_OAUTH_RESPONSE_SIZE): Promise<string> {
+  const contentLength = res.headers?.get?.("content-length");
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (!isNaN(size) && size > maxBytes) {
+      await res.body?.cancel();
+      throw new Error(`Response size (${size} bytes) exceeds maximum allowed size of ${maxBytes} bytes`);
+    }
+  }
+
+  if (res.body) {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let totalBytes = 0;
+    let raw = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new Error(`Response size exceeds maximum allowed size of ${maxBytes} bytes`);
+      }
+      raw += decoder.decode(value, { stream: true });
+    }
+    raw += decoder.decode();
+    return raw;
+  }
+
+  const raw = await res.text();
+  if (raw.length > maxBytes) {
+    throw new Error(`Response size exceeds maximum allowed size of ${maxBytes} bytes`);
+  }
+  return raw;
+}
+
 interface TokenResponse {
   access_token?: string;
   token_type?: string;
@@ -78,7 +116,7 @@ class OAuthTokenProvider implements TokenProvider {
         redirect: "error",
       });
       // SECURITY: Ensure body is read within the timeout window
-      rawText = await res.text();
+      rawText = await readBoundedText(res);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(`OAuth token request to ${tokenUrlSafe} failed: ${reason}`);
