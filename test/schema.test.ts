@@ -250,7 +250,7 @@ test("clone deeply copies objects", () => {
 });
 
 // The guard these cover was added in response to a real prototype-pollution
-// finding (see .jules/sentinel.md, 2026-07-21). `clone` runs over schemas
+// finding (2026-07-21). `clone` runs over schemas
 // parsed from a remote OpenAPI document, so a hostile `__proto__` key reaching
 // Object.prototype would poison every object in the process.
 test("clone drops keys that would pollute the prototype", () => {
