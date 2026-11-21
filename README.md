@@ -410,3 +410,4 @@ npm and tagged with a matching GitHub Release automatically.
 
 This project is an independent client for Mealie and is not affiliated with the
 Mealie project.
+
