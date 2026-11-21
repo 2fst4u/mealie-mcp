@@ -37,22 +37,22 @@ jobs:
     name: Build, release & publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-          # Persist credentials so we can push the version-bump commit + tag
-          # back to main at the end.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # The token is not left in .git/config for every later step (npm
+          # install, build, tests) to read. The steps that fetch or push pass it
+          # to that one git command via `gitauth` below.
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      # Node 24 bundles npm 11.19+, which already meets Trusted Publishing's
+      # npm >= 11.5.1, so no separate npm upgrade is needed. CI tests every PR
+      # on both Node 22 and 24; the package itself still supports Node >= 22.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22"
+          node-version: "24"
           cache: npm
           registry-url: "https://registry.npmjs.org"
-
-      # Trusted Publishing requires npm >= 11.5.1, newer than Node 22 bundles.
-      - name: Upgrade npm
-        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
@@ -70,8 +70,15 @@ jobs:
       # basing the bump on them keeps serialized/queued runs strictly monotonic.
       - name: Determine next version
         id: bump
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git fetch --tags --force origin
+          # Authenticate just this git command with the workflow token, the same
+          # way actions/checkout does, without storing it in .git/config.
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          gitauth() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
+          gitauth fetch --tags --force origin
           next() { node -e "const p=process.argv[1].split('.').map(Number);p[2]++;console.log(p.join('.'))" "$1"; }
           LATEST=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -n1)
           NEXT=$(next "${LATEST:-0.0.0}")
@@ -134,13 +141,19 @@ jobs:
         env:
           VERSION: ${{ steps.bump.outputs.version }}
           TAG: ${{ steps.bump.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Authenticate just this git command with the workflow token, the same
+          # way actions/checkout does, without storing it in .git/config.
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          gitauth() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Annotated: the GitHub release step needs the tag on the remote, and
           # `--follow-tags` only ever pushes annotated tags.
           git tag -a "$TAG" -m "v$VERSION" "$GITHUB_SHA"
-          git push origin "$TAG"
+          gitauth push origin "$TAG"
 
       # Record the bump on main. Pushes made with GITHUB_TOKEN do not trigger new
       # workflow runs, and `[skip ci]` is belt-and-suspenders, so this does not
@@ -148,13 +161,19 @@ jobs:
       - name: Push version bump to main
         env:
           VERSION: ${{ steps.bump.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Authenticate just this git command with the workflow token, the same
+          # way actions/checkout does, without storing it in .git/config.
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          gitauth() { git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" "$@"; }
           # Re-apply the bump onto whatever main is *now* on each attempt, rather
           # than carrying a commit that has to be rebased past someone else's
           # edit to the same lines. Reapplying cannot conflict: we take main's
           # files verbatim and set one field.
           for attempt in 1 2 3; do
-            git fetch origin main
+            gitauth fetch origin main
             git reset -q --hard origin/main
 
             CURRENT=$(node -p "require('./package.json').version")
@@ -168,7 +187,7 @@ jobs:
 
             npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
             git commit -aqm "chore(release): v$VERSION [skip ci]"
-            if git push -q origin HEAD:main; then
+            if gitauth push -q origin HEAD:main; then
               exit 0
             fi
             echo "::notice::main moved while pushing the bump; retrying ($attempt/3)."
