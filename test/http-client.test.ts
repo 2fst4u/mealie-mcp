@@ -49,6 +49,29 @@ test("throws error if missing required path parameter", async () => {
   );
 });
 
+test("rejects dot-segment path parameters that would climb to a parent route", async () => {
+  const tool: MealieTool = {
+    name: "test_tool",
+    description: "",
+    inputSchema: { type: "object" },
+    category: "test",
+    method: "get",
+    path: "/api/users/{userId}",
+    pathParams: ["userId"],
+    queryParams: [],
+    deprecated: false,
+  };
+  const fetchMock = mock.method(globalThis, "fetch", async () => new Response("{}", { status: 200 }));
+
+  for (const userId of [".", ".."]) {
+    await assert.rejects(
+      executeTool(dummyConfig, tool, { userId }, dummyAuth),
+      /Invalid value for path parameter userId/,
+    );
+  }
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
 test("builds correct URL with path and query parameters", async () => {
   const tool: MealieTool = {
     name: "test_tool",

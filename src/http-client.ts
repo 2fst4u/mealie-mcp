@@ -102,7 +102,14 @@ function buildUrl(config: Config, tool: MealieTool, args: Record<string, unknown
     if (value === undefined || value === null) {
       throw new Error(`Missing required path parameter: ${name}`);
     }
-    path = path.replace(`{${name}}`, encodeURIComponent(String(value)));
+    const segment = encodeURIComponent(String(value));
+    // SECURITY: `encodeURIComponent` leaves `.` alone, so a value of `.` or `..`
+    // would become a dot segment that the URL parser collapses — letting a GET
+    // tool climb to a parent route, including hard-excluded admin endpoints.
+    if (segment === "." || segment === "..") {
+      throw new Error(`Invalid value for path parameter ${name}: ${JSON.stringify(String(value))}`);
+    }
+    path = path.replace(`{${name}}`, segment);
   }
 
   // Resolve against the base rather than concatenating. `baseUrl + path` lets a
