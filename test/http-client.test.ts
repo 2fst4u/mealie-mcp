@@ -1392,7 +1392,7 @@ test("debugLog sanitizes sensitive query parameters in URL logs", async () => {
   const debugConfig: Config = { ...dummyConfig, debug: true };
   await executeTool(debugConfig, tool, { secret: "supersecret" }, dummyAuth);
 
-  assert.ok(stderrOutput.includes("https://api.example.com/api/test"));
+  assert.match(stderrOutput, /\[mealie-mcp\] GET https:\/\/api\.example\.com\/api\/test → 200\n/);
   assert.equal(stderrOutput.includes("supersecret"), false, "stderr should not contain sensitive query param values");
   assert.equal(stderrOutput.includes("secret="), false, "stderr should not contain query parameter string");
 });
