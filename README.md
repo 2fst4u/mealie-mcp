@@ -4,22 +4,19 @@ A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for
 [Mealie](https://github.com/mealie-recipes/mealie), the self-hosted recipe
 manager, meal planner and shopping-list app.
 
-It exposes **every endpoint of the Mealie REST API** as an MCP tool, so an LLM
-(Claude, etc.) can read and manage your recipes, meal plans, shopping lists,
-cookbooks, households, users and more.
+It turns the Mealie REST API into MCP tools, one per endpoint, so an LLM can
+read and manage your recipes, meal plans, shopping lists, cookbooks, households
+and users.
 
-- 🧩 **Broad API coverage, sane baseline** — one tool per Mealie endpoint,
-  trimmed to a safe baseline (~211 of ~259) so clients aren't overwhelmed and
-  risky endpoints aren't reachable.
-- 🔄 **Auto-adapts to your Mealie version** — on startup it fetches the OpenAPI
-  schema from *your* instance, so the tools always match exactly what your
-  server supports. A bundled snapshot is used as a fallback if the fetch fails.
-- 🚀 **Zero install** — runs straight from `npx`, ideal for MCPHub, Claude
-  Desktop, Cursor, and any other MCP client.
-- 🔒 **Safe by default** — admin/server-ops endpoints are never exposed, plus
-  read-only mode and per-category include/exclude filtering to narrow further.
-- 🔑 **Flexible auth** — a static API token, or an OAuth2 client-credentials flow
-  that fetches and refreshes access tokens for you.
+- Admin and server-ops endpoints, plus a few that are no use to a model, are
+  never exposed. That leaves about 211 of Mealie's ~259 endpoints. You can
+  narrow this further with a read-only mode and include/exclude filters.
+- Tools are generated at startup from your own instance's OpenAPI schema, so
+  they match the Mealie version you run. A bundled snapshot is used if the
+  fetch fails.
+- It runs from `npx` with nothing to install, over stdio.
+- It authenticates with a static API token or an OAuth2 client-credentials flow
+  that fetches and refreshes access tokens itself.
 
 ---
 
@@ -39,8 +36,8 @@ MEALIE_API_TOKEN="your-long-lived-token" \
 npx -y mealie-mcp
 ```
 
-The server speaks MCP over **stdio**, so you normally won't run it by hand —
-your MCP client launches it for you using the config below.
+The server speaks MCP over stdio only, so you normally won't run it by hand.
+Your MCP client launches it using the config below.
 
 ---
 
@@ -66,7 +63,8 @@ Add an entry to your client's MCP servers config (for Claude Desktop this is
 }
 ```
 
-That's the only required configuration. Everything else is optional tuning.
+`MEALIE_BASE_URL` is the only required setting, and almost every endpoint also
+needs a token.
 
 ---
 
@@ -78,9 +76,9 @@ In Mealie:
 2. Open the **API Tokens** section (`/user/profile/api-tokens`).
 3. Create a token, give it a name, and copy it.
 
-The token inherits the permissions of the user that created it, so create it
-under a user/household with the access you want the LLM to have. To give the
-model read-only-ish safety, also see [`MEALIE_READ_ONLY`](#configuration).
+The token has the permissions of the user that created it, so create it under
+a user and household with the access you want the LLM to have. To stop the
+model changing anything, also set [`MEALIE_READ_ONLY`](#configuration).
 
 ---
 
@@ -97,7 +95,7 @@ All configuration is via environment variables.
 | `MEALIE_OAUTH_CLIENT_SECRET` | – | — | OAuth client secret (required for the OAuth flow). |
 | `MEALIE_OAUTH_SCOPE` | – | — | Optional space-delimited OAuth scopes. |
 | `MEALIE_OAUTH_AUDIENCE` | – | — | Optional OAuth audience (some IdPs, e.g. Auth0, need it to mint a Mealie-targeted token). |
-| `MEALIE_READ_ONLY` | – | `false` | When `true`, only expose `GET` endpoints. Great for a safe, read-only assistant. |
+| `MEALIE_READ_ONLY` | – | `false` | When `true`, only expose `GET` endpoints. |
 | `MEALIE_TOOLS` | – | — | Comma-separated **allow-list** of tool names or category slugs to expose (e.g. `recipe,households_shopping_lists`). Empty = the full safe baseline. |
 | `MEALIE_EXCLUDE_TOOLS` | – | — | Comma-separated **deny-list** of tool names or category slugs to hide further (e.g. `groups_seeders,groups_migrations`). Applied on top of the always-on baseline trim. |
 | `MEALIE_USE_BUNDLED_SPEC` | – | `false` | Skip the live OpenAPI fetch and use the snapshot bundled with the package. |
@@ -109,21 +107,22 @@ All configuration is via environment variables.
 | `MEALIE_ACCEPT_LANGUAGE` | – | — | Optional `Accept-Language` header forwarded to Mealie (affects e.g. ingredient parsing locale). |
 | `MEALIE_ALLOWED_UPLOAD_DIRS` | – | — | Comma-separated directories that file uploads may read from. Unset (the default) means uploads are disabled. See [Restricting file uploads](#restricting-file-uploads). |
 
-> **Note:** Only path and query parameters are exposed as tool inputs. The few Mealie
-> endpoints that read a custom request header or cookie are not driven through those
-> parameters — `Accept-Language` is forwarded via `MEALIE_ACCEPT_LANGUAGE`, and
-> authentication is handled globally.
+Tool inputs cover path parameters, query parameters and the request body. The
+few Mealie endpoints that read a custom request header or cookie don't take it
+as a tool argument: `Accept-Language` comes from `MEALIE_ACCEPT_LANGUAGE`, and
+authentication is handled by the server.
 
 ### Restricting file uploads
 
-A handful of Mealie endpoints take a file — recipe images, recipe assets, ZIP
-imports, backups. For those, the tool argument is a path on the machine running
-this server, and the server reads that path and sends the bytes to Mealie.
+A handful of Mealie endpoints take a file, such as recipe images, recipe assets
+and ZIP imports. For those, the tool argument is an absolute path on the
+machine running this server. The server reads the file (up to 50 MB) and sends
+it to Mealie as multipart form data.
 
 That means anything the server process can read, a tool call can upload. Since
 the tool call is chosen by a model, and models read recipe pages and other
 untrusted text, a prompt-injection payload can in principle ask for a path you
-never intended — `~/.ssh/id_rsa` rather than a photo of dinner.
+never intended, such as `~/.ssh/id_rsa` instead of a photo of dinner.
 
 `MEALIE_ALLOWED_UPLOAD_DIRS` bounds that. Set it to a comma-separated list of
 directories, and any upload resolving outside all of them is refused:
@@ -139,18 +138,18 @@ being inside `/srv/mealie/imports`. If the variable is set but none of its
 directories exist, every upload is refused rather than silently falling back to
 unrestricted.
 
-Leaving it unset disables all uploads for security. If you use upload tools,
-setting this variable is required. If you never upload files, consider dropping
+Leaving it unset disables all uploads, so you must set it to use the upload
+tools. If you never upload files, consider dropping
 those tools entirely with `MEALIE_EXCLUDE_TOOLS`, or run the server read-only
 with `MEALIE_READ_ONLY=true`.
 
 ### Authenticating with OAuth (client credentials)
 
-By default the server authenticates with a static `MEALIE_API_TOKEN`. As an
-alternative — useful for headless/machine-to-machine setups — it can obtain an
-access token from your identity provider using the **OAuth2 client-credentials
-grant**, then send it as the `Authorization: Bearer` credential and refresh it
-automatically (proactively before expiry, and reactively on a `401`).
+By default the server authenticates with a static `MEALIE_API_TOKEN`. For
+machine-to-machine setups it can instead get an access token from your identity
+provider with the OAuth2 client-credentials grant. It sends that token as the
+`Authorization: Bearer` credential and refreshes it shortly before it expires,
+or after a `401`.
 
 ```bash
 MEALIE_OAUTH_TOKEN_URL="https://idp.example.com/oauth/token"
@@ -161,7 +160,9 @@ MEALIE_OAUTH_SCOPE="mealie"
 MEALIE_OAUTH_AUDIENCE="https://mealie.example.com"
 ```
 
-When these are set, OAuth **takes precedence** and `MEALIE_API_TOKEN` is ignored.
+When the token URL, client id and client secret are all set, OAuth takes
+precedence and `MEALIE_API_TOKEN` is ignored. If any of the three is missing,
+OAuth is treated as not configured.
 
 > **Precondition:** your Mealie must be a version that validates IdP-issued
 > access tokens as bearer tokens (via the provider's JWKS). The client sends
@@ -170,9 +171,9 @@ When these are set, OAuth **takes precedence** and `MEALIE_API_TOKEN` is ignored
 
 ### The safe baseline (≈211 of 259 endpoints)
 
-Mealie exposes ~259 endpoints, but the server ships a **safe baseline of ~211**
-so clients aren't overwhelmed and risky endpoints aren't reachable at all. Two
-groups are **permanently excluded** — they can't be re-enabled by configuration:
+Mealie has about 259 endpoints. The server exposes about 211 of them, so
+clients get a smaller tool list and risky endpoints can't be reached. Two
+groups are always excluded and can't be re-enabled by configuration:
 
 - **Admin / server-ops** endpoints (backups, maintenance, multi-tenant
   user/group/household management, debug, email config, AI providers). These are
@@ -184,9 +185,8 @@ groups are **permanently excluded** — they can't be re-enabled by configuratio
   (The `Users: Authentication` category is kept, since the server can
   authenticate via OAuth.)
 
-You can **narrow further** from this baseline — but not widen past it — with
-`MEALIE_TOOLS` / `MEALIE_EXCLUDE_TOOLS` using **category slugs** (or exact tool
-names). An entry also matches every category it prefixes at a `_` boundary, so
+You can narrow this baseline, but not widen it, with `MEALIE_TOOLS` and
+`MEALIE_EXCLUDE_TOOLS`, using category slugs or exact tool names. An entry also matches every category it prefixes at a `_` boundary, so
 `recipe` covers all the `recipe_*` categories (`recipe_crud`, `recipe_comments`,
 `recipe_timeline`, …) and `explore` all the `explore_*` ones. Examples:
 
@@ -202,13 +202,12 @@ MEALIE_READ_ONLY=true
 MEALIE_TOOLS="recipe,explore"
 ```
 
-On startup the server names any category your settings hide completely, so a
-missing tool is traceable to the setting responsible rather than looking like a
-gap in the server:
+On startup the server logs any category your settings hide completely, so you
+can tell which setting removed a missing tool. With the first example above:
 
 ```text
-[mealie-mcp] Exposing 75/259 tools across 12 categories.
-[mealie-mcp] MEALIE_TOOLS hides 33 categories entirely: ... (+25 more; MEALIE_DEBUG=true lists them).
+[mealie-mcp] Exposing 64/259 tools across 10 categories.
+[mealie-mcp] MEALIE_TOOLS hides 35 categories entirely: households_shopping_list_items, ... (+27 more; MEALIE_DEBUG=true lists them).
 ```
 
 ---
@@ -216,11 +215,10 @@ gap in the server:
 ## How tools are named
 
 Each tool name is derived from the Mealie OpenAPI tag (category) and operation.
-Uniquely-named operations use their bare operation name (e.g. `suggest_recipes`);
-operations whose name is reused across resources (the CRUD verbs `get_all`,
-`get_one`, `create_one`, `update_one`, `delete_one`, …) are prefixed with their
-category to stay unique and to keep them grouped. All names are kept well under
-the 64-character tool-name limit. For example:
+Operations with a unique name use it as-is (e.g. `get_todays_meals`).
+Operations whose name appears more than once in the spec (`get_all`, `get_one`,
+`create_one`, `suggest_recipes`, …) are prefixed with their category. Names are
+capped at `MEALIE_TOOL_NAME_MAX` characters (50 by default). For example:
 
 | Tool | Method & path |
 | --- | --- |
@@ -231,18 +229,16 @@ the 64-character tool-name limit. For example:
 | `households_mealplans_create_one` | `POST /api/households/mealplans` |
 | `app_about_get_app_info` | `GET /api/app/about` |
 
-Each tool's input schema declares its path parameters, query parameters and
-(where relevant) a `body` object — all generated directly from Mealie's OpenAPI
-schema, so the model gets accurate, fully-typed arguments.
+Each tool's input schema declares its path parameters, query parameters and,
+where relevant, a `body` object, all generated from Mealie's OpenAPI schema.
 
 ## How tools are described
 
 Mealie's spec is generated by FastAPI, so most operations carry only a
 title-cased summary (`Patch One`, `Get All`) and often no description at all.
-That is far too little text for a model — or a hub's tool-search index — to
-match a query like *"update recipe"* against, so each description is rebuilt
-from the parts of the spec that do carry meaning: the tag, the path and the
-HTTP method.
+That is too little text for a model, or a hub's tool-search index, to match a
+query like "update recipe" against, so each description is rebuilt from the
+tag, the path and the HTTP method.
 
 ```text
 Patch One — Recipe: CRUD. Partially update recipe.
@@ -261,38 +257,36 @@ patch, update, edit, modify, change, write, mealie.
 | Keywords | The tool's own name, its category and tag, the resource in both singular and plural, and every verb that means the same thing as the HTTP method |
 
 Because the keyword line carries the tool's own name, even a terse name like
-`patch_one` is findable by name — no tool has to be renamed to become
-searchable, so existing `MEALIE_TOOLS` filters and client allow-lists keep
-working.
+`patch_one` can be found by name without renaming it, so existing
+`MEALIE_TOOLS` filters and client allow-lists keep working.
 
 The generated text also spells out words Mealie writes as a single token
-(`mealplans` → *meal plans*), so meal-plan tools are findable by the words a
-user would actually type. Only the spec's own prose is truncated when a
-description would exceed the 2000-character budget — the keyword line is never
-the part that gets cut.
+(`mealplans` becomes "meal plans"), so meal-plan tools match the words a user
+would type. When a description would exceed 2000 characters, only the spec's
+own prose is truncated, never the keyword line.
 
-### File uploads
-
-Endpoints that upload files (recipe images, ZIP imports, backups, assets, …)
-take their file fields as **absolute paths to local files**, which the server
-reads and sends as multipart form data. The tool description tells the model
-which fields are file paths.
+Upload tools say in their description which fields are file paths. See
+[Restricting file uploads](#restricting-file-uploads).
 
 ### Troubleshooting: "name: String should have at most 64 characters"
 
-Some MCP clients/hubs (e.g. MCPHub, remote connectors) prefix every tool name
-with the server name — `mcp__<server>__<tool>` — and the **combined** string
+Some MCP clients and hubs (e.g. MCPHub, remote connectors) prefix every tool
+name with the server name, as `mcp__<server>__<tool>`, and the combined string
 must stay within the API's 64-character limit. If you hit this error:
 
 1. Keep the server's name/alias short (`mealie` is ideal).
 2. Lower the tool-name cap, e.g. `MEALIE_TOOL_NAME_MAX=30`, until it fits.
-3. The error is global — Claude rejects the *whole* tool list if **any** tool
-   (from **any** server) is too long, so the culprit may be a different server.
+3. Claude rejects the whole tool list if any tool from any server is too long,
+   so the culprit may be a different server.
 
 ### Categories
 
 <details>
 <summary>All 57 categories</summary>
+
+Counts are from the bundled snapshot, before any filtering. The `admin_*`
+categories and `users_passwords` are never exposed, and a few single endpoints
+in other categories are also dropped (see [the safe baseline](#the-safe-baseline-211-of-259-endpoints)).
 
 | Category | Tools |
 | --- | --- |
@@ -387,6 +381,7 @@ npm run refresh-spec -- https://demo.mealie.io
 | Path | Purpose |
 | --- | --- |
 | `src/index.ts` | Entry point: load config + spec, start stdio server. |
+| `src/description.ts` | Build searchable tool descriptions from the spec. |
 | `src/config.ts` | Environment-variable configuration. |
 | `src/auth.ts` | Resolve the `Authorization` header (static token or OAuth client credentials). |
 | `src/openapi-loader.ts` | Fetch live OpenAPI schema with bundled fallback. |
